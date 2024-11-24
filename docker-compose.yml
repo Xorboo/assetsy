@@ -4,7 +4,7 @@ services:
     container_name: assetsy-mongo
     restart: always
     ports:
-      - 27017:27017
+      - 28017:27017
     volumes:
       - ./data/mongo:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
