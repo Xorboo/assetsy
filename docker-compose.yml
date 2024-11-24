@@ -1,0 +1,36 @@
+services:
+  mongo:
+    image: mongo
+    container_name: assetsy-mongo
+    restart: always
+    env_file:
+      - secret.env
+    ports:
+      - 27017:27017
+    volumes:
+      - ./data/mongo:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+
+  chrome:
+    image: selenium/standalone-chrome:latest
+    container_name: assetsy-chrome
+    restart: always
+    hostname: chrome
+    privileged: true
+    shm_size: 2g
+    ports:
+      - '4444:4444'
+
+  assetsy:
+    container_name: assetsy
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - secret.env
+    depends_on:
+      - mongo
+      - chrome
+    volumes:
+      - .:/app
+    command: python -m assetsy
