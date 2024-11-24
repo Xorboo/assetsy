@@ -44,9 +44,8 @@ class TelegramBot:
         self.db_manager = db_manager
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
 
-        self.application = Application.builder().token(token).build()
+        self.application = Application.builder().token(token).post_init(self._post_init).build()
         self._setup_handlers()
-        self._register_commands()
 
         self.logger.info("Initialization complete")
 
@@ -67,6 +66,10 @@ class TelegramBot:
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
 
+    async def _post_init(self, application: Application) -> None:
+        commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
+        await self.application.bot.set_my_commands(commands)
+
     def _setup_handlers(self):
         self.commands_callbacks = {}
         for command in self.COMMANDS:
@@ -76,10 +79,6 @@ class TelegramBot:
 
         self.application.add_handler(CallbackQueryHandler(self._handle_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
-
-    async def _register_commands(self):
-        commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
-        await self.application.bot.set_my_commands(commands)
 
     def _get_keyboard_markup(self, exclude_commands: Optional[List[CommandType]] = None) -> InlineKeyboardMarkup:
         keyboard = [
@@ -140,8 +139,6 @@ class TelegramBot:
         query = update.callback_query
         user_id = update.effective_user.id
         command_parts = query.data.split("/")
-
-        self.logger.info(f"Callback received: {query.data}")
 
         if len(command_parts) == 1:
             command = command_parts[0]
