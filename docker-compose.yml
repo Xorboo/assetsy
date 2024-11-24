@@ -3,13 +3,17 @@ services:
     image: mongo
     container_name: assetsy-mongo
     restart: always
-    env_file:
-      - secret.env
     ports:
       - 27017:27017
     volumes:
       - ./data/mongo:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME:
+      MONGO_INITDB_ROOT_PASSWORD:
+      MONGO_INITDB_DATABASE:
+      MONGO_APP_USERNAME:
+      MONGO_APP_PASSWORD:
 
   chrome:
     image: selenium/standalone-chrome:latest
@@ -26,11 +30,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file:
-      - secret.env
     depends_on:
       - mongo
       - chrome
     volumes:
       - .:/app
     command: python -m assetsy
+    environment:
+      - MONGO_INITDB_DATABASE
+      - MONGO_APP_USERNAME
+      - MONGO_APP_PASSWORD
+      - TELEGRAM_BOT_TOKEN

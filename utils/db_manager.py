@@ -1,5 +1,6 @@
 import os
 from typing import List
+from urllib.parse import quote_plus
 
 from pymongo import MongoClient
 
@@ -10,12 +11,13 @@ class DBManager:
     def __init__(self):
         self.logger = setup_logger(__name__)
         self.logger.info("Initializing...")
-        username = os.environ["MONGO_INITDB_ROOT_USERNAME"]
-        password = os.environ["MONGO_INITDB_ROOT_PASSWORD"]
-        self.client = MongoClient(f"mongodb://{username}:{password}@mongo:27017/")
-        self.db = self.client["assetsy"]
+        username = quote_plus(os.environ["MONGO_APP_USERNAME"])
+        password = quote_plus(os.environ["MONGO_APP_PASSWORD"])
+        database = os.environ["MONGO_INITDB_DATABASE"]
+        self.client = MongoClient(f"mongodb://{username}:{password}@mongo:27017/?authSource={database}")
+        self.db = self.client[database]
         self.scraped_data_collection = self.db["scraped_data"]
-        self.users_collection = self.db["subscribed_users"]
+        self.users_collection = self.db["telegram_users"]
         self.logger.info("Done")
 
     def close(self):

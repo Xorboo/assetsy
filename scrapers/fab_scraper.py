@@ -1,11 +1,7 @@
 import json
 import re
 from html import unescape
-from typing import Dict, List, Optional
-
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from typing import List, Optional
 
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
@@ -25,54 +21,22 @@ class FabScraper(ScraperInterface):
         driver = get_driver()
         driver.get("https://www.fab.com/")
 
-        assets = []
-        # end_date = None
         try:
             json_data = self._extract_and_parse_json(driver)
             if not json_data:
                 self.logger.error("Could not find or parse JSON data")
                 return
-
             result = self._parse_free_items(json_data)
-
-            # wait = WebDriverWait(driver, 10)
-            # sections = wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "section")))
-
-            # target_section = None
-            # for section in sections:
-            #     try:
-            #         title = section.find_element(By.CSS_SELECTOR, "div[class*='Typography']")
-            #         if "Limited-Time Free" in title.text:
-            #             target_section = section
-            #             end_date = re.search(r"Limited-Time Free \((.*?)\)", title.text)
-            #             if end_date:
-            #                 end_date = end_date.group(1)
-            #             break
-            #     except Exception:
-            #         continue
-
-            # if target_section:
-            #     asset_items = target_section.find_elements(By.CSS_SELECTOR, "ul li")
-
-            #     for item in asset_items:
-            #         try:
-            #             a_element = item.find_element(By.XPATH, ".//a[contains(@class, 'fabkit-Typography-root')]")
-            #             title = a_element.text.strip()
-            #             url = a_element.get_attribute("href")
-
-            #             assets.append({"name": title, "url": url})
-            #         except Exception as e:
-            #             self.logger.error(f"Error extracting asset details: {e}")
         finally:
             driver.quit()
 
-        self.logger.info(f"Done, found {len(assets)} assets")
+        self.logger.info(f"Done, found {len(result.get("items", []))} assets")
         return result
 
     def create_message(self, data: dict) -> str:
         messages = []
         end_date = data.get("end_date", "<Unknown end date>")
-        messages.append(f"UE Fab Marketplace Free Assets (Until {end_date}):")
+        messages.append(f"UE Fab Marketplace Free Assets ({end_date}):")
 
         for item in data.get("items", []):
             title = item.get("title", "<unknown>")
@@ -139,3 +103,35 @@ class FabScraper(ScraperInterface):
 
                 if uid and title:
                     result["items"].append({"title": title, "url": f"https://fab.com/listings/{uid}"})
+
+
+# Old way of scraping, restricted by page width (needs additional clicks on scroll buttons)
+# Easier to parse the whole data json instead
+# wait = WebDriverWait(driver, 10)
+# sections = wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "section")))
+
+# target_section = None
+# for section in sections:
+#     try:
+#         title = section.find_element(By.CSS_SELECTOR, "div[class*='Typography']")
+#         if "Limited-Time Free" in title.text:
+#             target_section = section
+#             end_date = re.search(r"Limited-Time Free \((.*?)\)", title.text)
+#             if end_date:
+#                 end_date = end_date.group(1)
+#             break
+#     except Exception:
+#         continue
+
+# if target_section:
+#     asset_items = target_section.find_elements(By.CSS_SELECTOR, "ul li")
+
+#     for item in asset_items:
+#         try:
+#             a_element = item.find_element(By.XPATH, ".//a[contains(@class, 'fabkit-Typography-root')]")
+#             title = a_element.text.strip()
+#             url = a_element.get_attribute("href")
+
+#             assets.append({"name": title, "url": url})
+#         except Exception as e:
+#             self.logger.error(f"Error extracting asset details: {e}")
