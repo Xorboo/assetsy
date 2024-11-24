@@ -1,6 +1,9 @@
 import asyncio
 import os
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum, auto
+from typing import List, Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
@@ -10,93 +13,99 @@ from utils.db_manager import DBManager
 from utils.logger import setup_logger
 
 
+class CommandType(Enum):
+    START = auto()
+    HELP = auto()
+    SUBSCRIBE = auto()
+    SHOW_SUBSCRIPTIONS = auto()
+    ACTIVE_FREEBIES = auto()
+
+
+@dataclass
+class Command:
+    type: CommandType
+    command: str
+    description: str
+
+
 class TelegramBot:
+    COMMANDS = [
+        Command(CommandType.START, "start", "Start"),
+        Command(CommandType.HELP, "help", "Get list of commands"),
+        Command(CommandType.SUBSCRIBE, "show_subscriptions", "Show subscriptions"),
+        Command(CommandType.ACTIVE_FREEBIES, "show_freebies", "Show available freebies"),
+    ]
+
     def __init__(self, db_manager: DBManager):
         self.logger = setup_logger(__name__)
         self.logger.info("Initializing...")
+
         token = os.environ["TELEGRAM_BOT_TOKEN"]
         self.db_manager = db_manager
-        self.scrapers = get_scrapers()
-        self.scraper_names = [scraper.get_scraper_name() for scraper in self.scrapers]
+        self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
+
         self.application = Application.builder().token(token).build()
         self._setup_handlers()
-        self.logger.info("Done")
+        self._register_commands()
+
+        self.logger.info("Initialization complete")
 
     def start(self):
         self.application.run_polling()
 
     async def notify_subscribers(self, scraper: str, message: str):
-        """Async version of notify_subscribers"""
         subscribers = self.db_manager.get_scraper_subscribers(scraper)
+        reply_markup = self._get_keyboard_markup()
 
         tasks = []
         for user_id in subscribers:
-            task = self.application.bot.send_message(chat_id=user_id, text=message)
+            task = self.application.bot.send_message(chat_id=user_id, text=message, reply_markup=reply_markup)
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
-
         for user_id, result in zip(subscribers, results):
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
 
     def _setup_handlers(self):
-        self.application.add_handler(CommandHandler("start", self._start_command))
-        self.application.add_handler(CommandHandler("help", self._help_command))
-        self.application.add_handler(CommandHandler("subscribe", self._show_subscription_options))
-        self.application.add_handler(CommandHandler("my_subscriptions", self._show_subscriptions))
-        self.application.add_handler(CommandHandler("active_freebies", self._show_active_freebies))
-        self.application.add_handler(CallbackQueryHandler(self._handle_subscription_callback))
+        self.commands_callbacks = {}
+        for command in self.COMMANDS:
+            callback_method = getattr(self, f"_{command.command}_command")
+            self.application.add_handler(CommandHandler(command.command, callback_method))
+            self.commands_callbacks[command.command] = callback_method
+
+        self.application.add_handler(CallbackQueryHandler(self._handle_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
 
-    @staticmethod
-    def _commands_text():
-        return (
-            "Available commands:\n"
-            " - /help - Get list of comands\n"
-            " - /subscribe - Subscribe to scrapers\n"
-            " - /my_subscriptions - View your subscriptions\n"
-            " - /active_freebies - Show available freebies"
-        )
+    async def _register_commands(self):
+        commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
+        await self.application.bot.set_my_commands(commands)
 
-    async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup = None):
-        reply_markup = reply_markup or self._get_main_commands_markup()
-
-        if update.message:
-            await update.message.reply_text(message, reply_markup=reply_markup)
-        elif update.callback_query:
-            await update.callback_query.edit_message_text(message, reply_markup=reply_markup)
-        else:
-            self.logger.warning(f"Unknown update object:\n{update}")
-
-    async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(
-            update, f"Welcome! 👋\n\n{self._commands_text()}", reply_markup=self._get_main_commands_markup()
-        )
-
-    async def _help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(
-            update, self._commands_text(), reply_markup=self._get_main_commands_markup(include_help=False)
-        )
-
-    def _get_main_commands_markup(
-        self, include_help: bool = True, include_show: bool = True, include_freebies: bool = True
-    ) -> InlineKeyboardMarkup:
-        keyboard = []
-        if include_help:
-            keyboard.append([InlineKeyboardButton("Get Commands", callback_data="help")])
-        keyboard.append([InlineKeyboardButton("Update Subscriptions", callback_data="update")])
-        if include_show:
-            keyboard.append([InlineKeyboardButton("Show Subscriptions", callback_data="show")])
-        if include_freebies:
-            keyboard.append([InlineKeyboardButton("Get Active Freebies", callback_data="free")])
+    def _get_keyboard_markup(self, exclude_commands: Optional[List[CommandType]] = None) -> InlineKeyboardMarkup:
+        keyboard = [
+            [InlineKeyboardButton(cmd.description, callback_data=cmd.command)]
+            for cmd in self.COMMANDS
+            if cmd.type not in (exclude_commands or []) + [CommandType.START]
+        ]
         return InlineKeyboardMarkup(keyboard)
 
-    async def _show_subscription_options(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.callback_query:
+            await update.callback_query.answer("Here are available commands...")
+        await self._respond(update, "Choose a command:")
+
+    async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.callback_query:
+            await update.callback_query.answer("Hello there!")
+        await self._respond(update, "Welcome! 👋\n\nChoose a command:")
+
+    async def _show_subscriptions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.callback_query:
+            await update.callback_query.answer("Here's what you can monitor...")
+
         user_id = update.effective_user.id
         current_scrapers = self.db_manager.get_user_subscriptions(user_id)
-        available_scrapers = [scraper for scraper in self.scraper_names if scraper not in current_scrapers]
-        self.logger.debug(f"User {user_id} current scrapers: [{current_scrapers}], available: [{available_scrapers}]")
+        available_scrapers = set(self.scrapers.keys()) - set(current_scrapers)
 
         keyboard = []
         for scraper in available_scrapers:
@@ -105,72 +114,70 @@ class TelegramBot:
             keyboard.append(
                 [InlineKeyboardButton(f"Unsubscribe from [{scraper}]", callback_data=f"sub/remove/{scraper}")]
             )
-        keyboard.append([InlineKeyboardButton("Cancel", callback_data="help")])
+        keyboard.append([InlineKeyboardButton("Back", callback_data="help")])
 
-        if not keyboard:
-            await self._respond(update, "Error: No scrapers found.")
-            return
+        text = (
+            f"You are subscribed to: {', '.join(current_scrapers)}\n"
+            f"Available subscriptions: {', '.join(available_scrapers)}\n\n"
+            "Choose an option: "
+        )
+        await self._respond(update, text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await self._respond(update, "Choose an option:", reply_markup=reply_markup)
+    async def _show_freebies_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.callback_query:
+            await update.callback_query.answer("Here's what's free now...")
 
-    async def _show_subscriptions(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_id = update.effective_user.id
         subscriptions = self.db_manager.get_user_subscriptions(user_id)
-
-        if not subscriptions:
-            await self._respond(
-                update,
-                "You haven't subscribed to any scrapers yet.",
-                reply_markup=self._get_main_commands_markup(include_show=False),
-            )
-            return
-
-        msg = "Your current subscriptions:\n" + "\n".join(f"- {sub}" for sub in subscriptions)
-        await self._respond(update, msg, reply_markup=self._get_main_commands_markup(include_show=False))
-
-    async def _show_active_freebies(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        user_id = update.effective_user.id
-        subscriptions = self.db_manager.get_user_subscriptions(user_id)
-        date_string = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        msg = f"Available assets for your subscriptions on [{date_string}]:"
+        messages = [f"Available assets for your subscriptions on [{datetime.now():%Y-%m-%d %H:%M:%S}]:"]
         for scraper_name in subscriptions:
-            scraper = next((scraper for scraper in self.scrapers if scraper.get_scraper_name() == scraper_name), None)
-            assets = self.db_manager.get_assets(scraper_name)
-            scraper_msg = scraper.create_message(assets)
-            msg += f"\n\n{scraper_msg}"
-        await self._respond(update, msg, reply_markup=self._get_main_commands_markup())
+            if scraper := self.scrapers.get(scraper_name):
+                assets = self.db_manager.get_assets(scraper_name)
+                messages.append(scraper.create_message(assets))
+        await self._respond(update, "\n\n".join(messages), reply_markup=self._get_keyboard_markup())
 
-    async def _handle_subscription_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         user_id = update.effective_user.id
-        self.logger.info(f"Received request: {query.data}")
-        commands = query.data.split("/")
-        match commands[0]:
-            case "help":
-                await self._help_command(update, context)
-            case "update":
-                await self._show_subscription_options(update, context)
-            case "show":
-                await self._show_subscriptions(update, context)
-            case "free":
-                await self._show_active_freebies(update, context)
-            case "sub":
-                action = commands[1]
-                scraper = commands[2]
-                match action:
-                    case "add":
-                        self.db_manager.add_subscription(user_id, scraper)
-                        await query.answer(f"Subscribed to {scraper}")
-                        await self._respond(update, f"Successfully 'subscribed to [{scraper}]")
-                    case "remove":
-                        self.db_manager.remove_subscription(user_id, scraper)
-                        await query.answer(f"Unsubscribed from {scraper}")
-                        await self._respond(update, f"Successfully 'unsubscribed from [{scraper}]")
-                    case _:
-                        self.logger.error(f"Unexpected sub action [{action}]")
-                        await query.answer("Unexpected response")
-                        await self._respond(update, "Unexpected response")
+        command_parts = query.data.split("/")
+
+        self.logger.info(f"Callback received: {query.data}")
+
+        if len(command_parts) == 1:
+            command = command_parts[0]
+            if handler := self.commands_callbacks.get(command):
+                await handler(update, context)
+            else:
+                self.logger.error(f"Unknown command: {command}")
+                await query.answer("Error: Unknown command")
+                await self._respond(update, "Error: Unknown command")
+
+        elif command_parts[0] == "sub":
+            action, scraper = command_parts[1:]
+            if action == "add":
+                self.db_manager.add_subscription(user_id, scraper)
+                await query.answer(f"Subscribed to [{scraper}]")
+                await self._show_subscriptions_command(update, context)
+            elif action == "remove":
+                self.db_manager.remove_subscription(user_id, scraper)
+                await query.answer(f"Unsubscribed from [{scraper}]")
+                await self._show_subscriptions_command(update, context)
+            else:
+                self.logger.error(f"Unknown subscription action: {action}")
+                await query.answer("Invalid action")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(update, f"Use commands to interact with me.\n\n{self._commands_text()}")
+        await self._respond(update, "Use commands the following commands:")
+
+    async def _respond(self, update: Update, message: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
+        reply_markup = reply_markup or self._get_keyboard_markup()
+
+        if update.message:
+            await update.message.reply_text(message, reply_markup=reply_markup)
+        # Doing this to always create a new message on a query button click if possible
+        elif update.effective_message:
+            await update.effective_message.reply_text(message, reply_markup=reply_markup)
+        elif update.callback_query:
+            await update.callback_query.edit_message_text(message, reply_markup=reply_markup)
+        else:
+            self.logger.warning(f"Unknown update type: {update}")
