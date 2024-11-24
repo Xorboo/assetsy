@@ -30,7 +30,8 @@ class FabScraper(ScraperInterface):
         finally:
             driver.quit()
 
-        self.logger.info(f"Done, found {len(result.get("items", []))} assets")
+        total_assets = len(result.get("items", []))
+        self.logger.info(f"Done, found {total_assets} assets")
         return result
 
     def create_message(self, data: dict) -> str:
