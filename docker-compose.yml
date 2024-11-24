@@ -35,9 +35,8 @@ services:
       - chrome
     volumes:
       - .:/app
-    command: python -m assetsy
     environment:
-      - MONGO_INITDB_DATABASE
-      - MONGO_APP_USERNAME
-      - MONGO_APP_PASSWORD
-      - TELEGRAM_BOT_TOKEN
+      MONGO_INITDB_DATABASE:
+      MONGO_APP_USERNAME:
+      MONGO_APP_PASSWORD:
+      TELEGRAM_BOT_TOKEN:
