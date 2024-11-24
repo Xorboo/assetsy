@@ -41,11 +41,15 @@ class UnityScraper(ScraperInterface):
 
     def create_message(self, data: dict) -> str:
         messages = []
-        for asset in data["assets"]:
+        for asset in data.get("assets", []):
             name = asset.get("name", "<unknown>")
             url = asset.get("url", "<no-url>")
             coupon = asset.get("coupon", "No coupon available")
             messages.append(f" - {name} [{coupon}], {url}")
+
+        if not data.get("assets"):
+            messages.append(" - No free items found")
+
         return "Unity Free Assets:\n" + "\n".join(messages)
 
     def _scrape_asset_name(self, section):
