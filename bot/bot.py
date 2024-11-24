@@ -22,6 +22,24 @@ class TelegramBot:
         self._setup_handlers()
         self.logger.info("Done")
 
+    def start(self):
+        self.application.run_polling()
+
+    async def notify_subscribers(self, scraper: str, message: str):
+        """Async version of notify_subscribers"""
+        subscribers = self.db_manager.get_scraper_subscribers(scraper)
+
+        tasks = []
+        for user_id in subscribers:
+            task = self.application.bot.send_message(chat_id=user_id, text=message)
+            tasks.append(task)
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for user_id, result in zip(subscribers, results):
+            if isinstance(result, Exception):
+                self.logger.error(f"Failed to send message to user {user_id}: {result}")
+
     def _setup_handlers(self):
         self.application.add_handler(CommandHandler("start", self._start_command))
         self.application.add_handler(CommandHandler("help", self._help_command))
@@ -32,7 +50,7 @@ class TelegramBot:
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
 
     @staticmethod
-    def commands_text():
+    def _commands_text():
         return (
             "Available commands:\n"
             " - /help - Get list of comands\n"
@@ -53,12 +71,12 @@ class TelegramBot:
 
     async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self._respond(
-            update, f"Welcome! 👋\n\n{self.commands_text()}", reply_markup=self._get_main_commands_markup()
+            update, f"Welcome! 👋\n\n{self._commands_text()}", reply_markup=self._get_main_commands_markup()
         )
 
     async def _help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self._respond(
-            update, self.commands_text(), reply_markup=self._get_main_commands_markup(include_help=False)
+            update, self._commands_text(), reply_markup=self._get_main_commands_markup(include_help=False)
         )
 
     def _get_main_commands_markup(
@@ -155,36 +173,4 @@ class TelegramBot:
                         await self._respond(update, "Unexpected response")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(update, f"Use commands to interact with me.\n\n{self.commands_text()}")
-
-    def notify_subscribers(self, scraper: str, message: str):
-        subscribers = self.db_manager.get_scraper_subscribers(scraper)
-
-        async def send_notifications():
-            for user_id in subscribers:
-                try:
-                    await self.application.bot.send_message(chat_id=user_id, text=message)
-                except Exception as e:
-                    print(f"Failed to send message to user {user_id}: {e}")
-
-        # This is wrong, needs proper cleanup or bot will raise exceptions when closing
-        async def run_async():
-            try:
-                try:
-                    asyncio.get_running_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-
-                await send_notifications()
-            finally:
-                try:
-                    if loop:
-                        loop.close()
-                except:
-                    pass
-
-        asyncio.run(run_async())
-
-    def start(self):
-        self.application.run_polling()
+        await self._respond(update, f"Use commands to interact with me.\n\n{self._commands_text()}")

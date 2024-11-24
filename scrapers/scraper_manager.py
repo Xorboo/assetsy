@@ -14,7 +14,7 @@ class ScraperManager:
         self.scrapers = get_scrapers()
         self.logger.info("Done")
 
-    def process_scrapers(self):
+    async def process_scrapers(self):
         self.logger.info("Processing scrapers...")
         for scraper in self.scrapers:
             scraper_name = scraper.get_scraper_name()
@@ -27,7 +27,7 @@ class ScraperManager:
                 self.db_manager.update_assets(scraper_name, new_assets)
 
                 message = scraper.create_message(new_assets)
-                self.bot.notify_subscribers(scraper_name, message)
+                await self.bot.notify_subscribers(scraper_name, message)
             else:
                 self.logger.info(f"No changes detected for [{scraper_name}]")
         self.logger.info("Scraping complete")

@@ -1,4 +1,5 @@
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
 
 from bot.bot import TelegramBot
@@ -17,8 +18,8 @@ def main():
     scraper = ScraperManager(bot, db_manager)
 
     logger.info("Creating scheduler...")
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scraper.process_scrapers, "interval", minutes=1)
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(scraper.process_scrapers, trigger=IntervalTrigger(minutes=1), id="scrape", replace_existing=True)
 
     try:
         logger.info("Starting scheduler...")
