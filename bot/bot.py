@@ -200,8 +200,6 @@ class TelegramBot:
 
     async def _respond(self, update: Update, message: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
-
-        self.logger.info(f"Sending message: \n\n{message}")
         if update.message:
             await update.message.reply_text(message, reply_markup=reply_markup)
         # Doing this to always create a new message on a query button click if possible

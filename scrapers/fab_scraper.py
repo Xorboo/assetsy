@@ -46,7 +46,7 @@ class FabScraper(ScraperInterface):
         for item in data.get("items", []):
             title = TelegramUtils.escape_markdown_v2(item.get("title", "<unknown>"))
             url = TelegramUtils.escape_markdown_v2_url(item.get("url", "<no-url>"))
-            messages.append(f" \\- [{title}]{url}")
+            messages.append(f" \\- [{title}]({url})")
 
         if not data.get("items"):
             messages.append(" \\- ⚠️ No free items found")
