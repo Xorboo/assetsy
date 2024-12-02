@@ -50,7 +50,7 @@ class TelegramBot:
         self.logger.info("Initializing...")
 
         token = os.environ["TELEGRAM_BOT_TOKEN"]
-        admin_user_id = os.environ["TELEGRAM_ADMIN_USER_ID"]
+        self.admin_user_id = os.environ["TELEGRAM_ADMIN_USER_ID"]
 
         self.db_manager = db_manager
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
