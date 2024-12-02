@@ -3,6 +3,7 @@ import re
 from html import unescape
 from typing import List, Optional
 
+from bot.telegram_utils import TelegramUtils
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver

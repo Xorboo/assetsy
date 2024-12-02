@@ -33,9 +33,9 @@ class Command:
 class TelegramBot:
     COMMANDS = [
         Command(CommandType.START, "start", "Start"),
-        Command(CommandType.HELP, "help", "Get list of commands"),
-        Command(CommandType.SUBSCRIBE, "show_subscriptions", "Show subscriptions"),
-        Command(CommandType.ACTIVE_FREEBIES, "show_freebies", "Show available freebies"),
+        Command(CommandType.HELP, "help", "⚙️ Get list of commands"),
+        Command(CommandType.SUBSCRIBE, "show_subscriptions", "👀 Show subscriptions"),
+        Command(CommandType.ACTIVE_FREEBIES, "show_freebies", "🎁 Show available freebies"),
     ]
 
     def __init__(self, db_manager: DBManager):
@@ -104,17 +104,16 @@ class TelegramBot:
         if update.callback_query:
             await update.callback_query.answer("👀 Here's what you can monitor...")
 
-        user_id = update.effective_user.id
-        current_scrapers = self.db_manager.get_user_subscriptions(user_id)
-        available_scrapers = set(self.scrapers.keys()) - set(current_scrapers)
-
+        current_scrapers = self.db_manager.get_user_subscriptions(update.effective_user.id)
         keyboard = []
-        for scraper_name in available_scrapers:
+        for scraper_name in self.scrapers:
             name = self.scrapers[scraper_name].get_firendly_name()
-            keyboard.append([InlineKeyboardButton(f"✔️ Add {name}", callback_data=f"sub/add/{scraper_name}")])
-        for scraper_name in current_scrapers:
-            name = self.scrapers[scraper_name].get_firendly_name()
-            keyboard.append([InlineKeyboardButton(f"❌ Remove {name}", callback_data=f"sub/remove/{scraper_name}")])
+            subscribed = scraper_name in current_scrapers
+            if subscribed:
+                keyboard.append([InlineKeyboardButton(f"✔️ Add {name}", callback_data=f"sub/add/{scraper_name}")])
+            else:
+                keyboard.append([InlineKeyboardButton(f"❌ Remove {name}", callback_data=f"sub/rem/{scraper_name}")])
+
         keyboard.append([InlineKeyboardButton("↩ Back", callback_data="help")])
 
         text = "👀 Choose an option: "
@@ -153,7 +152,7 @@ class TelegramBot:
                 self.db_manager.add_subscription(user_id, scraper)
                 await query.answer(f"✔️ Subscribed to [{scraper}]")
                 await self._show_subscriptions_command(update, context)
-            elif action == "remove":
+            elif action == "rem":
                 self.db_manager.remove_subscription(user_id, scraper)
                 await query.answer(f"❌ Unsubscribed from [{scraper}]")
                 await self._show_subscriptions_command(update, context)
