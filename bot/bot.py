@@ -110,9 +110,9 @@ class TelegramBot:
             name = self.scrapers[scraper_name].get_firendly_name()
             subscribed = scraper_name in current_scrapers
             if subscribed:
-                keyboard.append([InlineKeyboardButton(f"✔️ Add {name}", callback_data=f"sub/add/{scraper_name}")])
-            else:
                 keyboard.append([InlineKeyboardButton(f"❌ Remove {name}", callback_data=f"sub/rem/{scraper_name}")])
+            else:
+                keyboard.append([InlineKeyboardButton(f"✔️ Add {name}", callback_data=f"sub/add/{scraper_name}")])
 
         keyboard.append([InlineKeyboardButton("↩ Back", callback_data="help")])
 
