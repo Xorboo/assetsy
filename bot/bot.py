@@ -150,7 +150,7 @@ class TelegramBot:
 
         keyboard.append([InlineKeyboardButton("↩ Back", callback_data="help")])
 
-        text = "👀 Choose an option: "
+        text = "👀 Update your subscriptions"
         await self._respond(update, text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def _show_freebies_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
