@@ -14,7 +14,7 @@ class DBManager:
         username = quote_plus(os.environ["MONGO_APP_USERNAME"])
         password = quote_plus(os.environ["MONGO_APP_PASSWORD"])
         database = os.environ["MONGO_INITDB_DATABASE"]
-        self.client = MongoClient(f"mongodb://{username}:{password}@mongo:28017/?authSource={database}")
+        self.client = MongoClient(f"mongodb://{username}:{password}@mongo:27018/?authSource={database}")
         self.db = self.client[database]
         self.scraped_data_collection = self.db["scraped_data"]
         self.users_collection = self.db["telegram_users"]
