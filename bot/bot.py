@@ -97,21 +97,24 @@ class TelegramBot:
     async def _handle_error(self, update: Update, context: CallbackContext):
         try:
             exception = context.error
-            self.logger.error(f"Exception occurred: {exception}")
+            stack_trace = "".join(traceback.format_exception(None, exception, exception.__traceback__))
+            self.logger.error(f"Exception occurred: {exception}\n\n{stack_trace}")
 
             exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
-            stack_trace = "".join(traceback.format_exception(None, exception, exception.__traceback__))
             stack_trace_text = TelegramUtils.escape_markdown_v2_code(stack_trace)
             error_message = (
-                "⚠️ An exception occurred:\n"
+                "⚠️ *An exception occurred*:\n"
                 f"```\n{exception_text}\n```\n\n"
                 f"Stack trace:\n```\n{stack_trace_text}\n```"
             )
             await self.application.bot.send_message(
-                chat_id=self.admin_user_id, text=error_message, parse_mode="MarkdownV2"
+                chat_id=self.admin_user_id, text=error_message, parse_mode=ParseMode.MARKDOWN_V2
             )
         except Exception as e:
-            self.logger.error(f"Failed to send error message to admin: {e}\n\nOriginal error: {exception}")
+            inner_stack_trace = "".join(traceback.format_exception(None, e, e.__traceback__))
+            self.logger.error(
+                f"Failed to send error message to admin: {e}\n\n{inner_stack_trace}\n\nOriginal error: {exception}"
+            )
 
     def _get_keyboard_markup(self, exclude_commands: Optional[List[CommandType]] = None) -> InlineKeyboardMarkup:
         keyboard = [
