@@ -6,6 +6,7 @@ from enum import Enum, auto
 from typing import List, Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from scrapers.scrapers import get_scrapers
@@ -90,17 +91,17 @@ class TelegramBot:
 
     async def _help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
-            await update.callback_query.answer("Here are available commands...")
-        await self._respond(update, "Choose a command:")
+            await update.callback_query.answer("⚙️ Here are available commands...")
+        await self._respond(update, "⚙️ Choose a command:")
 
     async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
-            await update.callback_query.answer("Hello there!")
-        await self._respond(update, "Welcome! 👋\n\nChoose a command:")
+            await update.callback_query.answer("👋 Hello there!")
+        await self._respond(update, "Welcome! 👋\n\n⚙️ Choose a command:")
 
     async def _show_subscriptions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
-            await update.callback_query.answer("Here's what you can monitor...")
+            await update.callback_query.answer("👀 Here's what you can monitor...")
 
         user_id = update.effective_user.id
         current_scrapers = self.db_manager.get_user_subscriptions(user_id)
@@ -108,12 +109,10 @@ class TelegramBot:
 
         keyboard = []
         for scraper in available_scrapers:
-            keyboard.append([InlineKeyboardButton(f"Subscribe to [{scraper}]", callback_data=f"sub/add/{scraper}")])
+            keyboard.append([InlineKeyboardButton(f"✔️ Add *{scraper}*", callback_data=f"sub/add/{scraper}")])
         for scraper in current_scrapers:
-            keyboard.append(
-                [InlineKeyboardButton(f"Unsubscribe from [{scraper}]", callback_data=f"sub/remove/{scraper}")]
-            )
-        keyboard.append([InlineKeyboardButton("Back", callback_data="help")])
+            keyboard.append([InlineKeyboardButton(f"❌ Remove *{scraper}*", callback_data=f"sub/remove/{scraper}")])
+        keyboard.append([InlineKeyboardButton("↩ Back", callback_data="help")])
 
         text = (
             f"You are subscribed to: {', '.join(current_scrapers)}\n"
@@ -124,11 +123,11 @@ class TelegramBot:
 
     async def _show_freebies_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
-            await update.callback_query.answer("Here's what's free now...")
+            await update.callback_query.answer("🎁 Here's what's free now...")
 
         user_id = update.effective_user.id
         subscriptions = self.db_manager.get_user_subscriptions(user_id)
-        messages = [f"Available assets for your subscriptions on [{datetime.now():%Y-%m-%d %H:%M:%S}]:"]
+        messages = [f"🎁 *Available assets for your subscriptions on [{datetime.now():%Y-%m-%d %H:%M:%S}]*"]
         for scraper_name in subscriptions:
             if scraper := self.scrapers.get(scraper_name):
                 assets = self.db_manager.get_assets(scraper_name)
@@ -146,25 +145,25 @@ class TelegramBot:
                 await handler(update, context)
             else:
                 self.logger.error(f"Unknown command: {command}")
-                await query.answer("Error: Unknown command")
-                await self._respond(update, "Error: Unknown command")
+                await query.answer("⚠️ Error: Unknown command")
+                await self._respond(update, "⚠️ Error: Unknown command")
 
         elif command_parts[0] == "sub":
             action, scraper = command_parts[1:]
             if action == "add":
                 self.db_manager.add_subscription(user_id, scraper)
-                await query.answer(f"Subscribed to [{scraper}]")
+                await query.answer(f"✔️ Subscribed to [{scraper}]")
                 await self._show_subscriptions_command(update, context)
             elif action == "remove":
                 self.db_manager.remove_subscription(user_id, scraper)
-                await query.answer(f"Unsubscribed from [{scraper}]")
+                await query.answer(f"❌ Unsubscribed from [{scraper}]")
                 await self._show_subscriptions_command(update, context)
             else:
                 self.logger.error(f"Unknown subscription action: {action}")
-                await query.answer("Invalid action")
+                await query.answer("⚠️ Invalid subscription action")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(update, "Use commands the following commands:")
+        await self._respond(update, "⚙️ Use commands the following commands:")
 
     async def _respond(self, update: Update, message: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
@@ -173,8 +172,12 @@ class TelegramBot:
             await update.message.reply_text(message, reply_markup=reply_markup)
         # Doing this to always create a new message on a query button click if possible
         elif update.effective_message:
-            await update.effective_message.reply_text(message, reply_markup=reply_markup)
+            await update.effective_message.reply_text(
+                message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
+            )
         elif update.callback_query:
-            await update.callback_query.edit_message_text(message, reply_markup=reply_markup)
+            await update.callback_query.edit_message_text(
+                message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
+            )
         else:
             self.logger.warning(f"Unknown update type: {update}")

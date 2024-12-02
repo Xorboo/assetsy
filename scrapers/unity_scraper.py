@@ -45,12 +45,12 @@ class UnityScraper(ScraperInterface):
             name = asset.get("name", "<unknown>")
             url = asset.get("url", "<no-url>")
             coupon = asset.get("coupon", "No coupon available")
-            messages.append(f" - {name} [{coupon}], {url}")
+            messages.append(f" - *[{coupon}]* [{name}]({url})")
 
         if not data.get("assets"):
-            messages.append(" - No free items found")
+            messages.append(" - ⚠️ No free items found")
 
-        return "Unity Free Assets:\n" + "\n".join(messages)
+        return "🦭 *Unity Free Assets*:\n" + "\n".join(messages)
 
     def _scrape_asset_name(self, section):
         name = "<error>"

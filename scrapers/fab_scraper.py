@@ -37,15 +37,15 @@ class FabScraper(ScraperInterface):
     def create_message(self, data: dict) -> str:
         messages = []
         end_date = data.get("end_date", "<Unknown end date>")
-        messages.append(f"UE Fab Marketplace Free Assets ({end_date}):")
+        messages.append(f"🦭 *UE Fab Marketplace Free Assets* ({end_date}):")
 
         for item in data.get("items", []):
             title = item.get("title", "<unknown>")
             url = item.get("url", "<no-url>")
-            messages.append(f" - {title}, {url}")
+            messages.append(f" - [{title}]{url}")
 
         if not data.get("items"):
-            messages.append(" - No free items found")
+            messages.append(" - ⚠️ No free items found")
 
         return "\n".join(messages)
 
