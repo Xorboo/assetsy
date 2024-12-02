@@ -1,14 +1,20 @@
 import asyncio
 import os
-import re
 from dataclasses import dataclass
-from datetime import datetime
 from enum import Enum, auto
 from typing import List, Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import (
+    Application,
+    CallbackContext,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from bot.telegram_utils import TelegramUtils
 from scrapers.scrapers import get_scrapers
@@ -44,6 +50,8 @@ class TelegramBot:
         self.logger.info("Initializing...")
 
         token = os.environ["TELEGRAM_BOT_TOKEN"]
+        admin_user_id = os.environ["TELEGRAM_ADMIN_USER_ID"]
+
         self.db_manager = db_manager
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
 
@@ -74,6 +82,8 @@ class TelegramBot:
         await self.application.bot.set_my_commands(commands)
 
     def _setup_handlers(self):
+        self.application.add_error_handler(self._handle_error)
+
         self.commands_callbacks = {}
         for command in self.COMMANDS:
             callback_method = getattr(self, f"_{command.command}_command")
@@ -82,6 +92,16 @@ class TelegramBot:
 
         self.application.add_handler(CallbackQueryHandler(self._handle_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
+
+    def _handle_error(self, update: Update, context: CallbackContext):
+        try:
+            exception = context.error
+            self.logger.error(f"Exception occurred: {exception}")
+            exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
+            error_message = f"An exception occurred:\n```{exception_text}```"
+            context.bot.send_message(chat_id=self.admin_user_id, text=error_message, parse_mode="MarkdownV2")
+        except Exception as e:
+            self.logger.error(f"Failed to send error message to admin: {e}\n\nOriginal error: {exception}")
 
     def _get_keyboard_markup(self, exclude_commands: Optional[List[CommandType]] = None) -> InlineKeyboardMarkup:
         keyboard = [
@@ -126,8 +146,7 @@ class TelegramBot:
 
         user_id = update.effective_user.id
         subscriptions = self.db_manager.get_user_subscriptions(user_id)
-        date = TelegramUtils.escape_markdown_v2(f"{datetime.now():%Y-%m-%d %H:%M:%S}")
-        messages = [f"🎁 *Available assets for your subscriptions on \\[{date}\\]*"]
+        messages = ["🎁 *Available assets for your subscriptions*"]
         for scraper_name in subscriptions:
             if scraper := self.scrapers.get(scraper_name):
                 assets = self.db_manager.get_assets(scraper_name)

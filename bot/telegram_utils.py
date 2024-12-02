@@ -10,3 +10,7 @@ class TelegramUtils:
     @staticmethod
     def escape_markdown_v2_url(url: str) -> str:
         return re.sub(r"([()\\])", r"\\\1", url)
+
+    @staticmethod
+    def escape_markdown_v2_code(text: str) -> str:
+        return re.sub(r"([`\\])", r"\\\1", text)
