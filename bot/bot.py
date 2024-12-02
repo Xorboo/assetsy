@@ -10,6 +10,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
+from bot.telegram_utils import TelegramUtils
 from scrapers.scrapers import get_scrapers
 from utils.db_manager import DBManager
 from utils.logger import setup_logger
@@ -125,7 +126,8 @@ class TelegramBot:
 
         user_id = update.effective_user.id
         subscriptions = self.db_manager.get_user_subscriptions(user_id)
-        messages = [f"🎁 *Available assets for your subscriptions on [{datetime.now():%Y-%m-%d %H:%M:%S}]*"]
+        date = TelegramUtils.escape_markdown_v2(f"{datetime.now():%Y-%m-%d %H:%M:%S}")
+        messages = [f"🎁 *Available assets for your subscriptions on [{date}]*"]
         for scraper_name in subscriptions:
             if scraper := self.scrapers.get(scraper_name):
                 assets = self.db_manager.get_assets(scraper_name)
