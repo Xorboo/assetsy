@@ -93,13 +93,15 @@ class TelegramBot:
         self.application.add_handler(CallbackQueryHandler(self._handle_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
 
-    def _handle_error(self, update: Update, context: CallbackContext):
+    async def _handle_error(self, update: Update, context: CallbackContext):
         try:
             exception = context.error
             self.logger.error(f"Exception occurred: {exception}")
             exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
             error_message = f"An exception occurred:\n```{exception_text}```"
-            context.bot.send_message(chat_id=self.admin_user_id, text=error_message, parse_mode="MarkdownV2")
+            await self.application.bot.send_message(
+                chat_id=self.admin_user_id, text=error_message, parse_mode="MarkdownV2"
+            )
         except Exception as e:
             self.logger.error(f"Failed to send error message to admin: {e}\n\nOriginal error: {exception}")
 
