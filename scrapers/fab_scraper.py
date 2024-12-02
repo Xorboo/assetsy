@@ -40,11 +40,8 @@ class FabScraper(ScraperInterface):
 
     def create_message(self, data: dict) -> str:
         messages = []
-        messages.append(
-            TelegramUtils.escape_markdown_v2(
-                f"🦭 *UE Fab Marketplace Free Assets* ({data.get("end_date", "<Unknown end date>")}):"
-            )
-        )
+        end_date = TelegramUtils.escape_markdown_v2(data.get("end_date", "<Unknown end date>"))
+        messages.append(f"🦭 *UE Fab Marketplace Free Assets* \\({end_date}\\):")
 
         for item in data.get("items", []):
             title = TelegramUtils.escape_markdown_v2(item.get("title", "<unknown>"))
