@@ -3,6 +3,7 @@ import re
 from html import unescape
 from typing import List, Optional
 
+from bot.bot import TelegramBot
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
@@ -15,6 +16,9 @@ class FabScraper(ScraperInterface):
 
     def get_scraper_name(self) -> str:
         return "unreal_fab_marketplace"
+
+    def get_firendly_name(self) -> str:
+        return "Unreal Engine (Fab Marketplace)"
 
     def scrape_data(self) -> dict:
         self.logger.info("Fetching UE Marketplace assets...")
@@ -36,16 +40,16 @@ class FabScraper(ScraperInterface):
 
     def create_message(self, data: dict) -> str:
         messages = []
-        end_date = data.get("end_date", "<Unknown end date>")
+        end_date = TelegramBot.escape_markdown_v2(data.get("end_date", "<Unknown end date>"))
         messages.append(f"🦭 *UE Fab Marketplace Free Assets* ({end_date}):")
 
         for item in data.get("items", []):
-            title = item.get("title", "<unknown>")
-            url = item.get("url", "<no-url>")
-            messages.append(f" - [{title}]{url}")
+            title = TelegramBot.escape_markdown_v2(item.get("title", "<unknown>"))
+            url = TelegramBot.escape_markdown_v2_url(item.get("url", "<no-url>"))
+            messages.append(f" \\- [{title}]{url}")
 
         if not data.get("items"):
-            messages.append(" - ⚠️ No free items found")
+            messages.append(" \\- ⚠️ No free items found")
 
         return "\n".join(messages)
 

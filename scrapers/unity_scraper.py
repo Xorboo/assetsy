@@ -4,6 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from bot.bot import TelegramBot
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
@@ -16,6 +17,9 @@ class UnityScraper(ScraperInterface):
 
     def get_scraper_name(self) -> str:
         return "unity"
+
+    def get_firendly_name(self) -> str:
+        return "Unity Engine"
 
     def scrape_data(self) -> dict:
         self.logger.info("Fetching Unity assets...")
@@ -42,13 +46,13 @@ class UnityScraper(ScraperInterface):
     def create_message(self, data: dict) -> str:
         messages = []
         for asset in data.get("assets", []):
-            name = asset.get("name", "<unknown>")
-            url = asset.get("url", "<no-url>")
+            name = TelegramBot.escape_markdown_v2(asset.get("name", "<unknown>"))
+            url = TelegramBot.escape_markdown_v2_url(asset.get("url", "<no-url>"))
             coupon = asset.get("coupon", "No coupon available")
-            messages.append(f" - *[{coupon}]* [{name}]({url})")
+            messages.append(f" \\- *\\[{coupon}\\]* [{name}]({url})")
 
         if not data.get("assets"):
-            messages.append(" - ⚠️ No free items found")
+            messages.append(" \\- ⚠️ No free items found")
 
         return "🦭 *Unity Free Assets*:\n" + "\n".join(messages)
 

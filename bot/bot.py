@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum, auto
@@ -67,6 +68,15 @@ class TelegramBot:
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
 
+    @staticmethod
+    def escape_markdown_v2(text: str) -> str:
+        special_characters = r"_*[]()~`>#+-=|{}.!"
+        return re.sub(f"([{re.escape(special_characters)}])", r"\\\1", text)
+
+    @staticmethod
+    def escape_markdown_v2_url(url: str) -> str:
+        return re.sub(r"([()\\])", r"\\\1", url)
+
     async def _post_init(self, application: Application) -> None:
         commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
         await self.application.bot.set_my_commands(commands)
@@ -108,17 +118,15 @@ class TelegramBot:
         available_scrapers = set(self.scrapers.keys()) - set(current_scrapers)
 
         keyboard = []
-        for scraper in available_scrapers:
-            keyboard.append([InlineKeyboardButton(f"✔️ Add *{scraper}*", callback_data=f"sub/add/{scraper}")])
-        for scraper in current_scrapers:
-            keyboard.append([InlineKeyboardButton(f"❌ Remove *{scraper}*", callback_data=f"sub/remove/{scraper}")])
+        for scraper_name in available_scrapers:
+            name = self.scrapers[scraper_name].get_firendly_name()
+            keyboard.append([InlineKeyboardButton(f"✔️ Add {name}", callback_data=f"sub/add/{scraper_name}")])
+        for scraper_name in current_scrapers:
+            name = self.scrapers[scraper_name].get_firendly_name()
+            keyboard.append([InlineKeyboardButton(f"❌ Remove {name}", callback_data=f"sub/remove/{scraper_name}")])
         keyboard.append([InlineKeyboardButton("↩ Back", callback_data="help")])
 
-        text = (
-            f"You are subscribed to: {', '.join(current_scrapers)}\n"
-            f"Available subscriptions: {', '.join(available_scrapers)}\n\n"
-            "Choose an option: "
-        )
+        text = "👀 Choose an option: "
         await self._respond(update, text, reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def _show_freebies_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
