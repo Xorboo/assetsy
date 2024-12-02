@@ -3,7 +3,6 @@ import re
 from html import unescape
 from typing import List, Optional
 
-from bot.bot import TelegramBot
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
@@ -40,12 +39,12 @@ class FabScraper(ScraperInterface):
 
     def create_message(self, data: dict) -> str:
         messages = []
-        end_date = TelegramBot.escape_markdown_v2(data.get("end_date", "<Unknown end date>"))
+        end_date = TelegramUtils.escape_markdown_v2(data.get("end_date", "<Unknown end date>"))
         messages.append(f"🦭 *UE Fab Marketplace Free Assets* ({end_date}):")
 
         for item in data.get("items", []):
-            title = TelegramBot.escape_markdown_v2(item.get("title", "<unknown>"))
-            url = TelegramBot.escape_markdown_v2_url(item.get("url", "<no-url>"))
+            title = TelegramUtils.escape_markdown_v2(item.get("title", "<unknown>"))
+            url = TelegramUtils.escape_markdown_v2_url(item.get("url", "<no-url>"))
             messages.append(f" \\- [{title}]{url}")
 
         if not data.get("items"):

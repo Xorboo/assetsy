@@ -68,15 +68,6 @@ class TelegramBot:
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
 
-    @staticmethod
-    def escape_markdown_v2(text: str) -> str:
-        special_characters = r"_*[]()~`>#+-=|{}.!"
-        return re.sub(f"([{re.escape(special_characters)}])", r"\\\1", text)
-
-    @staticmethod
-    def escape_markdown_v2_url(url: str) -> str:
-        return re.sub(r"([()\\])", r"\\\1", url)
-
     async def _post_init(self, application: Application) -> None:
         commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
         await self.application.bot.set_my_commands(commands)
