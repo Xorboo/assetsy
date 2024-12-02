@@ -1,5 +1,6 @@
 import asyncio
 import os
+import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import List, Optional
@@ -97,8 +98,15 @@ class TelegramBot:
         try:
             exception = context.error
             self.logger.error(f"Exception occurred: {exception}")
+
             exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
-            error_message = f"An exception occurred:\n```{exception_text}```"
+            stack_trace = "".join(traceback.format_exception(None, exception, exception.__traceback__))
+            stack_trace_text = TelegramUtils.escape_markdown_v2_code(stack_trace)
+            error_message = (
+                "⚠️ An exception occurred:\n"
+                f"```\n{exception_text}\n```\n\n"
+                f"Stack trace:\n```\n{stack_trace_text}\n```"
+            )
             await self.application.bot.send_message(
                 chat_id=self.admin_user_id, text=error_message, parse_mode="MarkdownV2"
             )
