@@ -48,7 +48,7 @@ class UnityScraper(ScraperInterface):
         for asset in data.get("assets", []):
             name = TelegramUtils.escape_markdown_v2(asset.get("name", "<unknown>"))
             url = TelegramUtils.escape_markdown_v2_url(asset.get("url", "<no-url>"))
-            coupon = asset.get("coupon", "No coupon available")
+            coupon = TelegramUtils.escape_markdown_v2(asset.get("coupon", "No coupon available"))
             messages.append(f" \\- *\\[{coupon}\\]* [{name}]({url})")
 
         if not data.get("assets"):
