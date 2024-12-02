@@ -148,13 +148,14 @@ class TelegramBot:
 
         elif command_parts[0] == "sub":
             action, scraper = command_parts[1:]
+            name = self.scrapers[scraper].get_firendly_name()
             if action == "add":
                 self.db_manager.add_subscription(user_id, scraper)
-                await query.answer(f"✔️ Subscribed to [{scraper}]")
+                await query.answer(f"✔️ Subscribed to {name}")
                 await self._show_subscriptions_command(update, context)
             elif action == "rem":
                 self.db_manager.remove_subscription(user_id, scraper)
-                await query.answer(f"❌ Unsubscribed from [{scraper}]")
+                await query.answer(f"❌ Unsubscribed from {name}")
                 await self._show_subscriptions_command(update, context)
             else:
                 self.logger.error(f"Unknown subscription action: {action}")

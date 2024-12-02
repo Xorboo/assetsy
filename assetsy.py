@@ -19,7 +19,7 @@ def main():
 
     logger.info("Creating scheduler...")
     scheduler = AsyncIOScheduler()
-    scheduler.add_job(scraper.process_scrapers, trigger=IntervalTrigger(minutes=1), id="scrape", replace_existing=True)
+    scheduler.add_job(scraper.process_scrapers, trigger=IntervalTrigger(days=1), id="scrape", replace_existing=True)
 
     try:
         logger.info("Starting scheduler...")
