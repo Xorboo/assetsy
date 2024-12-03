@@ -49,7 +49,7 @@ class UnityScraper(ScraperInterface):
             name = TelegramUtils.escape_markdown_v2(asset.get("name", "<unknown>"))
             url = TelegramUtils.escape_markdown_v2_url(asset.get("url", "<no-url>"))
             coupon = TelegramUtils.escape_markdown_v2(asset.get("coupon", "No coupon available"))
-            messages.append(f" \\- *\\[Coupon: {coupon}\\]* [{name}]({url})")
+            messages.append(f" \\- *\\[Coupon: `{coupon}`\\]* [{name}]({url})")
 
         if not data.get("assets"):
             messages.append(" \\- ⚠️ No free items found")
