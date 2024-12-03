@@ -70,7 +70,9 @@ class TelegramBot:
 
         tasks = []
         for user_id in subscribers:
-            task = self.application.bot.send_message(chat_id=user_id, text=message, reply_markup=reply_markup)
+            task = self.application.bot.send_message(
+                chat_id=user_id, text=message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
