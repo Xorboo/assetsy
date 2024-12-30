@@ -54,17 +54,11 @@ class FabScraper(ScraperInterface):
         return "\n".join(messages)
 
     def _extract_and_parse_json(self, driver) -> Optional[dict]:
-        element = driver.find_element("id", "js-dom-data-prefetched-data")
+        element = driver.find_element("id", "js-json-data-prefetched-data")
         if not element:
             return None
 
-        content = element.get_attribute("innerHTML")
-        content = content.strip()
-        if not content.startswith("<!--") or not content.endswith("-->"):
-            return None
-
-        content = content[4:-3]
-        content = unescape(content)
+        content = element.get_attribute("innerHTML").strip()
         return json.loads(content)
 
     def _parse_free_items(self, json_data: dict) -> dict[str, List[dict]]:
