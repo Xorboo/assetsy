@@ -3,10 +3,12 @@ services:
     image: mongo
     container_name: assetsy-mongo
     restart: always
+    networks:
+      - assetsy-network
     ports:
       - 27018:27017
     volumes:
-      - ./data/mongo:/data/db
+      - mongo-data:/data/db
       - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     environment:
       MONGO_INITDB_ROOT_USERNAME:
@@ -14,6 +16,12 @@ services:
       MONGO_INITDB_DATABASE:
       MONGO_APP_USERNAME:
       MONGO_APP_PASSWORD:
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   chrome:
     image: selenium/standalone-chrome:latest
@@ -22,8 +30,16 @@ services:
     hostname: chrome
     privileged: true
     shm_size: 2g
+    networks:
+      - assetsy-network
     ports:
       - '4444:4444'
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4444/wd/hub/status']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   assetsy:
     container_name: assetsy
@@ -31,12 +47,23 @@ services:
       context: .
       dockerfile: Dockerfile
     depends_on:
-      - mongo
-      - chrome
-    volumes:
-      - .:/app
+      mongo:
+        condition: service_healthy
+      chrome:
+        condition: service_healthy
+    restart: always
+    networks:
+      - assetsy-network
     environment:
-      MONGO_INITDB_DATABASE:
+      MONGO_INITDB_DATABASE: assetsy
       MONGO_APP_USERNAME:
       MONGO_APP_PASSWORD:
+      MONGO_APP_DOMAIN: mongo
+      MONGO_APP_PORT: 27017
       TELEGRAM_BOT_TOKEN:
+      TELEGRAM_ADMIN_USER_ID:
+      SELENIUM_DOMAIN: chrome
+
+networks:
+  assetsy-network:
+    driver: bridge

@@ -16,7 +16,9 @@ class DBManager:
         domain = quote_plus(os.environ["MONGO_APP_DOMAIN"])
         port = quote_plus(os.environ["MONGO_APP_PORT"])
         database = os.environ["MONGO_INITDB_DATABASE"]
-        self.client = MongoClient(f"mongodb://{username}:{password}@{domain}:{port}/?authSource={database}")
+        connection_string = f"mongodb://{username}:{password}@{domain}:{port}/?authSource={database}"
+        self.logger.info(f"Connecting to DB on '{connection_string.replace(password, '<PASSWORD>')}'")
+        self.client = MongoClient(connection_string)
         self.db = self.client[database]
         self.scraped_data_collection = self.db["scraped_data"]
         self.users_collection = self.db["telegram_users"]
