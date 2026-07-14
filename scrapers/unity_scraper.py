@@ -18,7 +18,7 @@ class UnityScraper(ScraperInterface):
     def get_scraper_name(self) -> str:
         return "unity"
 
-    def get_firendly_name(self) -> str:
+    def get_friendly_name(self) -> str:
         return "Unity"
 
     def scrape_data(self) -> dict:

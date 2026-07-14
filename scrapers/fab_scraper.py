@@ -1,6 +1,5 @@
 import json
 import re
-from typing import List
 
 from selenium.webdriver.common.by import By
 
@@ -24,7 +23,7 @@ class FabScraper(ScraperInterface):
     def get_scraper_name(self) -> str:
         return "unreal_fab_marketplace"
 
-    def get_firendly_name(self) -> str:
+    def get_friendly_name(self) -> str:
         return "Unreal Engine (Fab Marketplace)"
 
     def scrape_data(self) -> dict:
@@ -56,7 +55,7 @@ class FabScraper(ScraperInterface):
 
         return "\n".join(messages)
 
-    def _parse_free_items(self, homepage: dict) -> dict[str, List[dict]]:
+    def _parse_free_items(self, homepage: dict) -> dict[str, list[dict]]:
         result = {"end_date": "", "items": []}
         self._parse_carousel_url(homepage, result)
         self._parse_blades_items(homepage, result)

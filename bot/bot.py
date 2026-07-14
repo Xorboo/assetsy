@@ -3,7 +3,6 @@ import os
 import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import List, Optional
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
@@ -76,7 +75,7 @@ class TelegramBot:
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for user_id, result in zip(subscribers, results):
+        for user_id, result in zip(subscribers, results, strict=True):
             if isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
 
@@ -105,9 +104,7 @@ class TelegramBot:
             exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
             stack_trace_text = TelegramUtils.escape_markdown_v2_code(stack_trace)
             error_message = (
-                "⚠️ *An exception occurred*:\n"
-                f"```\n{exception_text}\n```\n\n"
-                f"Stack trace:\n```\n{stack_trace_text}\n```"
+                f"⚠️ *An exception occurred*:\n```\n{exception_text}\n```\n\nStack trace:\n```\n{stack_trace_text}\n```"
             )
             await self.application.bot.send_message(
                 chat_id=self.admin_user_id, text=error_message, parse_mode=ParseMode.MARKDOWN_V2
@@ -118,7 +115,7 @@ class TelegramBot:
                 f"Failed to send error message to admin: {e}\n\n{inner_stack_trace}\n\nOriginal error: {exception}"
             )
 
-    def _get_keyboard_markup(self, exclude_commands: Optional[List[CommandType]] = None) -> InlineKeyboardMarkup:
+    def _get_keyboard_markup(self, exclude_commands: list[CommandType] | None = None) -> InlineKeyboardMarkup:
         keyboard = [
             [InlineKeyboardButton(cmd.description, callback_data=cmd.command)]
             for cmd in self.COMMANDS
@@ -143,7 +140,7 @@ class TelegramBot:
         current_scrapers = self.db_manager.get_user_subscriptions(update.effective_user.id)
         keyboard = []
         for scraper_name in self.scrapers:
-            name = self.scrapers[scraper_name].get_firendly_name()
+            name = self.scrapers[scraper_name].get_friendly_name()
             subscribed = scraper_name in current_scrapers
             if subscribed:
                 keyboard.append([InlineKeyboardButton(f"❌ Remove {name}", callback_data=f"sub/rem/{scraper_name}")])
@@ -184,7 +181,7 @@ class TelegramBot:
 
         elif command_parts[0] == "sub":
             action, scraper = command_parts[1:]
-            name = self.scrapers[scraper].get_firendly_name()
+            name = self.scrapers[scraper].get_friendly_name()
             if action == "add":
                 self.db_manager.add_subscription(user_id, scraper)
                 await query.answer(f"✔️ Subscribed to {name}")
@@ -200,7 +197,7 @@ class TelegramBot:
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self._respond(update, "⚙️ Use commands the following commands:")
 
-    async def _respond(self, update: Update, message: str, reply_markup: Optional[InlineKeyboardMarkup] = None):
+    async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
         if update.message:
             await update.message.reply_text(message, reply_markup=reply_markup)

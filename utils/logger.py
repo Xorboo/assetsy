@@ -3,19 +3,18 @@ import sys
 
 
 def setup_logger(name: str = None) -> logging.Logger:
-    logger = logging.getLogger(name or __name__)
-
-    if not logger.handlers:
-        logger.setLevel(logging.DEBUG)
-
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(logging.DEBUG)
-
-        formatter = logging.Formatter(
-            fmt="%(asctime)s | %(name)-26s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    root = logging.getLogger()
+    if not root.handlers:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(
+            logging.Formatter(
+                fmt="%(asctime)s | %(name)-26s | %(levelname)-8s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+            )
         )
-        console_handler.setFormatter(formatter)
+        root.addHandler(handler)
+        root.setLevel(logging.INFO)
+        # Quiet the per-request/polling spam, keep their warnings
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-        logger.addHandler(console_handler)
-
-    return logger
+    return logging.getLogger(name or __name__)

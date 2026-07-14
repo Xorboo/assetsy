@@ -7,7 +7,7 @@ class ScraperInterface(ABC):
         pass
 
     @abstractmethod
-    def get_firendly_name(self) -> str:
+    def get_friendly_name(self) -> str:
         pass
 
     @abstractmethod

@@ -1,13 +1,14 @@
-from datetime import datetime
+from datetime import timedelta
 
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
 from dotenv import load_dotenv
+from telegram.ext import ContextTypes
 
 from bot.bot import TelegramBot
 from scrapers.scraper_manager import ScraperManager
 from utils.db_manager import DBManager
 from utils.logger import setup_logger
+
+SCRAPE_INTERVAL = timedelta(days=1)
 
 
 def main():
@@ -19,25 +20,20 @@ def main():
     bot = TelegramBot(db_manager)
     scraper = ScraperManager(bot, db_manager)
 
-    logger.info("Creating scheduler...")
-    scheduler = AsyncIOScheduler()
-    # next_run_time makes the first scrape happen right away instead of 24h after every restart
-    scheduler.add_job(
-        scraper.process_scrapers,
-        trigger=IntervalTrigger(days=1),
-        next_run_time=datetime.now(),
-        id="scrape",
-        replace_existing=True,
+    async def scrape_job(context: ContextTypes.DEFAULT_TYPE):
+        await scraper.process_scrapers()
+
+    # first=1 makes the first scrape happen right away instead of 24h after every restart;
+    # the misfire grace covers the gap between scheduling here and the job queue actually
+    # starting (after Telegram init), which would otherwise silently skip the first run
+    bot.application.job_queue.run_repeating(
+        scrape_job, interval=SCRAPE_INTERVAL, first=1, job_kwargs={"misfire_grace_time": 300}
     )
 
     try:
-        logger.info("Starting scheduler...")
-        scheduler.start()
         logger.info("Starting bot...")
         bot.start()
-    except KeyboardInterrupt:
-        logger.warning("Keyboard interrupt received, quitting...")
-        scheduler.shutdown()
+    finally:
         db_manager.close()
 
 

@@ -1,6 +1,5 @@
 import os
 import re
-from typing import List
 
 from pymongo import MongoClient
 
@@ -41,10 +40,10 @@ class DBManager:
     def remove_subscription(self, user_id: int, scraper_name: str) -> None:
         self.users_collection.update_one({"user_id": user_id}, {"$pull": {"subscriptions": scraper_name}})
 
-    def get_user_subscriptions(self, user_id: int) -> List[str]:
+    def get_user_subscriptions(self, user_id: int) -> list[str]:
         user = self.users_collection.find_one({"user_id": user_id})
         return user.get("subscriptions", []) if user else []
 
-    def get_scraper_subscribers(self, scraper_name: str) -> List[int]:
+    def get_scraper_subscribers(self, scraper_name: str) -> list[int]:
         cursor = self.users_collection.find({"subscriptions": scraper_name}, {"user_id": 1})
         return [doc["user_id"] for doc in cursor]
