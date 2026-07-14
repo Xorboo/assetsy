@@ -6,6 +6,7 @@ from enum import Enum, auto
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackContext,
@@ -131,7 +132,7 @@ class TelegramBot:
     async def _start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
             await update.callback_query.answer("👋 Hello there!")
-        await self._respond(update, "Welcome! 👋\n\n⚙️ Choose a command:")
+        await self._respond(update, "Welcome\\! 👋\n\n⚙️ Choose a command:")
 
     async def _show_subscriptions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
@@ -163,7 +164,7 @@ class TelegramBot:
             if scraper := self.scrapers.get(scraper_name):
                 assets = self.db_manager.get_assets(scraper_name)
                 messages.append(scraper.create_message(assets))
-        await self._respond(update, "\n\n".join(messages), reply_markup=self._get_keyboard_markup())
+        await self._respond(update, "\n\n".join(messages), new_message=True)
 
     async def _handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -197,18 +198,26 @@ class TelegramBot:
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self._respond(update, "⚙️ Use commands the following commands:")
 
-    async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
+    async def _respond(
+        self,
+        update: Update,
+        message: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+        new_message: bool = False,
+    ):
         reply_markup = reply_markup or self._get_keyboard_markup()
-        if update.message:
-            await update.message.reply_text(message, reply_markup=reply_markup)
-        # Doing this to always create a new message on a query button click if possible
-        elif update.effective_message:
-            await update.effective_message.reply_text(
-                message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
-            )
-        elif update.callback_query:
-            await update.callback_query.edit_message_text(
-                message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
-            )
-        else:
-            self.logger.warning(f"Unknown update type: {update}")
+
+        # Button presses edit the menu message in place; new_message forces a separate
+        # message for content worth keeping in the chat history
+        if update.callback_query and not new_message:
+            try:
+                await update.callback_query.edit_message_text(
+                    message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
+                )
+                return
+            except BadRequest as e:
+                if "not modified" in str(e).lower():
+                    return
+                self.logger.warning(f"Failed to edit message, sending a new one: {e}")
+
+        await update.effective_message.reply_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
