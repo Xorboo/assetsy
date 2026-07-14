@@ -1,12 +1,19 @@
 import json
 import re
-from html import unescape
-from typing import List, Optional
+from typing import List
+
+from selenium.webdriver.common.by import By
 
 from bot.telegram_utils import TelegramUtils
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
+
+# Same JSON the fab.com homepage embeds as prefetched data, served directly as an API.
+# Cloudflare 403s plain python HTTP clients (TLS fingerprinting), so we fetch it through
+# the Selenium browser — much lighter than rendering the whole homepage.
+HOMEPAGE_LAYOUT_URL = "https://www.fab.com/i/layouts/homepage"
+FREE_BLADE_TITLE = "Limited-Time Free"
 
 
 class FabScraper(ScraperInterface):
@@ -21,18 +28,14 @@ class FabScraper(ScraperInterface):
         return "Unreal Engine (Fab Marketplace)"
 
     def scrape_data(self) -> dict:
-        self.logger.info("Fetching UE Marketplace assets...")
+        self.logger.info("Fetching Fab marketplace assets...")
         driver = get_driver()
-        driver.get("https://www.fab.com/")
-
         try:
-            json_data = self._extract_and_parse_json(driver)
-            if not json_data:
-                self.logger.error("Could not find or parse JSON data")
-                return
-            result = self._parse_free_items(json_data)
+            driver.get(HOMEPAGE_LAYOUT_URL)
+            homepage = json.loads(driver.find_element(By.TAG_NAME, "pre").text)
         finally:
             driver.quit()
+        result = self._parse_free_items(homepage)
 
         total_assets = len(result.get("items", []))
         self.logger.info(f"Done, found {total_assets} assets")
@@ -53,36 +56,23 @@ class FabScraper(ScraperInterface):
 
         return "\n".join(messages)
 
-    def _extract_and_parse_json(self, driver) -> Optional[dict]:
-        element = driver.find_element("id", "js-json-data-prefetched-data")
-        if not element:
-            return None
-
-        content = element.get_attribute("innerHTML").strip()
-        return json.loads(content)
-
-    def _parse_free_items(self, json_data: dict) -> dict[str, List[dict]]:
+    def _parse_free_items(self, homepage: dict) -> dict[str, List[dict]]:
         result = {"end_date": "", "items": []}
-        homepage = json_data.get("/i/layouts/homepage", {})
         self._parse_carousel_url(homepage, result)
         self._parse_blades_items(homepage, result)
         return result
 
     def _parse_carousel_url(self, homepage, result):
-        all_items_url = None
         for carousel_item in homepage.get("carousel", []):
-            if carousel_item.get("title") == "Limited-Time Free":
-                all_items_url = carousel_item.get("ctaUrl")
-                result["items"].append({"title": "ALL ITEMS", "url": all_items_url})
+            if carousel_item.get("title") == FREE_BLADE_TITLE:
+                result["items"].append({"title": "ALL ITEMS", "url": carousel_item.get("ctaUrl")})
                 break
 
     def _parse_blades_items(self, homepage, result):
-        blades = homepage.get("blades", [])
         free_blade = None
-
-        for blade in blades:
+        for blade in homepage.get("blades", []):
             title = blade.get("title", "")
-            if "Limited-Time Free" in title and "Until" in title:
+            if FREE_BLADE_TITLE in title and "Until" in title:
                 free_blade = blade
 
                 date_match = re.search(r"\((.*?)\)", title) or re.search(r"Until\s+(.*)", title)
@@ -91,17 +81,16 @@ class FabScraper(ScraperInterface):
                 break
 
         if not free_blade:
-            return result
+            return
 
+        # Everything in the Limited-Time Free blade is free; the old discountedPrice==0
+        # check broke when Fab dropped that field from startingPrice.
         for tile in free_blade.get("tiles", []):
             listing = tile.get("listing", {})
-            price_info = listing.get("startingPrice", {})
-            if price_info.get("discountedPrice") == 0:
-                uid = listing.get("uid")
-                title = listing.get("title")
-
-                if uid and title:
-                    result["items"].append({"title": title, "url": f"https://fab.com/listings/{uid}"})
+            uid = listing.get("uid")
+            title = listing.get("title")
+            if uid and title:
+                result["items"].append({"title": title, "url": f"https://fab.com/listings/{uid}"})
 
 
 if __name__ == "__main__":
@@ -109,35 +98,3 @@ if __name__ == "__main__":
     data = scraper.scrape_data()
     message = scraper.create_message(data)
     print(message)
-
-
-# Old way of scraping, restricted by page width (needs additional clicks on scroll buttons)
-# Easier to parse the whole data json instead
-# wait = WebDriverWait(driver, 10)
-# sections = wait.until(EC.presence_of_all_elements_located((By.TAG_NAME, "section")))
-
-# target_section = None
-# for section in sections:
-#     try:
-#         title = section.find_element(By.CSS_SELECTOR, "div[class*='Typography']")
-#         if "Limited-Time Free" in title.text:
-#             target_section = section
-#             end_date = re.search(r"Limited-Time Free \((.*?)\)", title.text)
-#             if end_date:
-#                 end_date = end_date.group(1)
-#             break
-#     except Exception:
-#         continue
-
-# if target_section:
-#     asset_items = target_section.find_elements(By.CSS_SELECTOR, "ul li")
-
-#     for item in asset_items:
-#         try:
-#             a_element = item.find_element(By.XPATH, ".//a[contains(@class, 'fabkit-Typography-root')]")
-#             title = a_element.text.strip()
-#             url = a_element.get_attribute("href")
-
-#             assets.append({"name": title, "url": url})
-#         except Exception as e:
-#             self.logger.error(f"Error extracting asset details: {e}")

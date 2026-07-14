@@ -1,6 +1,6 @@
 import os
+import re
 from typing import List
-from urllib.parse import quote_plus
 
 from pymongo import MongoClient
 
@@ -11,14 +11,10 @@ class DBManager:
     def __init__(self):
         self.logger = setup_logger(__name__)
         self.logger.info("Initializing...")
-        username = quote_plus(os.environ["MONGO_APP_USERNAME"])
-        password = quote_plus(os.environ["MONGO_APP_PASSWORD"])
-        domain = quote_plus(os.environ["MONGO_APP_DOMAIN"])
-        port = quote_plus(os.environ["MONGO_APP_PORT"])
-        database = os.environ["MONGO_INITDB_DATABASE"]
-        connection_string = f"mongodb://{username}:{password}@{domain}:{port}/?authSource={database}"
-        self.logger.info(f"Connecting to DB on '{connection_string.replace(password, '<PASSWORD>')}'")
-        self.client = MongoClient(connection_string)
+        uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+        database = os.environ.get("MONGO_DB", "assetsy")
+        self.logger.info(f"Connecting to DB '{database}' on '{re.sub(r'://[^@]+@', '://<CREDENTIALS>@', uri)}'")
+        self.client = MongoClient(uri)
         self.db = self.client[database]
         self.scraped_data_collection = self.db["scraped_data"]
         self.users_collection = self.db["telegram_users"]

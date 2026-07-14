@@ -1,69 +1,45 @@
+# LOCAL DEVELOPMENT compose: bot + local MongoDB + Selenium Chrome.
+# Secrets come from .env (see .env.template).
+
 services:
   mongo:
-    image: mongo
+    image: mongo:7
     container_name: assetsy-mongo
-    restart: always
-    networks:
-      - assetsy-network
+    restart: unless-stopped
     ports:
-      - 27018:27017
+      - "27018:27017" # 27018 to not clash with ObyWatcher's local mongo; inspect with Compass / mongosh
     volumes:
-      - mongo-data:/data/db
-      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
-    environment:
-      MONGO_INITDB_ROOT_USERNAME:
-      MONGO_INITDB_ROOT_PASSWORD:
-      MONGO_INITDB_DATABASE:
-      MONGO_APP_USERNAME:
-      MONGO_APP_PASSWORD:
-    healthcheck:
-      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      - mongo_data:/data/db
 
   chrome:
     image: selenium/standalone-chrome:latest
     container_name: assetsy-chrome
-    restart: always
-    hostname: chrome
-    privileged: true
+    restart: unless-stopped
     shm_size: 2g
-    networks:
-      - assetsy-network
     ports:
-      - '4444:4444'
+      - "4444:4444" # exposed so scrapers can also be run locally against this Chrome
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:4444/wd/hub/status']
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  assetsy:
+  bot:
     container_name: assetsy
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
+    restart: unless-stopped
     depends_on:
       mongo:
-        condition: service_healthy
+        condition: service_started
       chrome:
         condition: service_healthy
-    restart: always
-    networks:
-      - assetsy-network
     environment:
-      MONGO_INITDB_DATABASE: assetsy
-      MONGO_APP_USERNAME:
-      MONGO_APP_PASSWORD:
-      MONGO_APP_DOMAIN: mongo
-      MONGO_APP_PORT: 27017
-      TELEGRAM_BOT_TOKEN:
-      TELEGRAM_ADMIN_USER_ID:
-      SELENIUM_DOMAIN: chrome
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_USER_ID: ${TELEGRAM_ADMIN_USER_ID}
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB: ${MONGO_DB:-assetsy}
+      SELENIUM_URL: http://chrome:4444/wd/hub
 
-networks:
-  assetsy-network:
-    driver: bridge
+volumes:
+  mongo_data:
