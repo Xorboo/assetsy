@@ -56,7 +56,9 @@ class TelegramBot:
         self.db_manager = db_manager
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
 
-        self.application = Application.builder().token(token).post_init(self._post_init).build()
+        self.application = (
+            Application.builder().token(token).concurrent_updates(True).post_init(self._post_init).build()
+        )
         self._setup_handlers()
 
         self.logger.info("Initialization complete")
@@ -135,7 +137,9 @@ class TelegramBot:
     async def _show_subscriptions_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.callback_query:
             await update.callback_query.answer("👀 Here's what you can monitor...")
+        await self._render_subscriptions(update)
 
+    async def _render_subscriptions(self, update: Update):
         current_scrapers = self.db_manager.get_user_subscriptions(update.effective_user.id)
         keyboard = []
         for scraper_name in self.scrapers:
@@ -196,11 +200,11 @@ class TelegramBot:
             if action == "add":
                 self.db_manager.add_subscription(user_id, scraper)
                 await query.answer(f"✔️ Subscribed to {name}")
-                await self._show_subscriptions_command(update, context)
+                await self._render_subscriptions(update)
             elif action == "rem":
                 self.db_manager.remove_subscription(user_id, scraper)
                 await query.answer(f"❌ Unsubscribed from {name}")
-                await self._show_subscriptions_command(update, context)
+                await self._render_subscriptions(update)
             else:
                 self.logger.error(f"Unknown subscription action: {action}")
                 await query.answer("⚠️ Invalid subscription action")
