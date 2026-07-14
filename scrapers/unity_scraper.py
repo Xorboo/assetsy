@@ -82,3 +82,10 @@ class UnityScraper(ScraperInterface):
         except Exception as e:
             self.logger.error(f"Error extracting coupon code: {e}")
         return coupon_code
+
+
+if __name__ == "__main__":
+    scraper = UnityScraper()
+    data = scraper.scrape_data()
+    message = scraper.create_message(data)
+    print(message)

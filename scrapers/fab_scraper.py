@@ -104,6 +104,13 @@ class FabScraper(ScraperInterface):
                     result["items"].append({"title": title, "url": f"https://fab.com/listings/{uid}"})
 
 
+if __name__ == "__main__":
+    scraper = FabScraper()
+    data = scraper.scrape_data()
+    message = scraper.create_message(data)
+    print(message)
+
+
 # Old way of scraping, restricted by page width (needs additional clicks on scroll buttons)
 # Easier to parse the whole data json instead
 # wait = WebDriverWait(driver, 10)
