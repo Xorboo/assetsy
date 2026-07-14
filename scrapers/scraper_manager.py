@@ -1,3 +1,5 @@
+import asyncio
+
 from bot.bot import TelegramBot
 from scrapers.scrapers import get_scrapers
 from utils.db_manager import DBManager
@@ -16,18 +18,28 @@ class ScraperManager:
 
     async def process_scrapers(self):
         self.logger.info("Processing scrapers...")
+        errors = []
         for scraper in self.scrapers:
             scraper_name = scraper.get_scraper_name()
-
-            stored_assets = self.db_manager.get_assets(scraper_name)
-            new_assets = scraper.scrape_data()
-
-            if new_assets != stored_assets:
-                self.logger.info(f"Changes detected for [{scraper_name}]")
-                self.db_manager.update_assets(scraper_name, new_assets)
-
-                message = scraper.create_message(new_assets)
-                await self.bot.notify_subscribers(scraper_name, message)
-            else:
-                self.logger.info(f"No changes detected for [{scraper_name}]")
+            try:
+                await self._process_scraper(scraper, scraper_name)
+            except Exception as e:
+                self.logger.exception(f"Scraper [{scraper_name}] failed")
+                errors.append(e)
         self.logger.info("Scraping complete")
+
+        if errors:
+            raise ExceptionGroup("Some scrapers failed", errors)
+
+    async def _process_scraper(self, scraper, scraper_name: str):
+        stored_assets = self.db_manager.get_assets(scraper_name)
+        new_assets = await asyncio.to_thread(scraper.scrape_data)
+
+        if new_assets != stored_assets:
+            self.logger.info(f"Changes detected for [{scraper_name}]")
+            self.db_manager.update_assets(scraper_name, new_assets)
+
+            message = scraper.create_message(new_assets)
+            await self.bot.notify_subscribers(scraper_name, message)
+        else:
+            self.logger.info(f"No changes detected for [{scraper_name}]")

@@ -16,8 +16,8 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from telegram.helpers import escape_markdown
 
-from bot.telegram_utils import TelegramUtils
 from scrapers.scrapers import get_scrapers
 from utils.db_manager import DBManager
 from utils.logger import setup_logger
@@ -66,13 +66,10 @@ class TelegramBot:
 
     async def notify_subscribers(self, scraper: str, message: str):
         subscribers = self.db_manager.get_scraper_subscribers(scraper)
-        reply_markup = self._get_keyboard_markup()
 
         tasks = []
         for user_id in subscribers:
-            task = self.application.bot.send_message(
-                chat_id=user_id, text=message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
-            )
+            task = self.application.bot.send_message(chat_id=user_id, text=message, parse_mode=ParseMode.MARKDOWN_V2)
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -102,8 +99,9 @@ class TelegramBot:
             stack_trace = "".join(traceback.format_exception(None, exception, exception.__traceback__))
             self.logger.error(f"Exception occurred: {exception}\n\n{stack_trace}")
 
-            exception_text = TelegramUtils.escape_markdown_v2_code(str(exception))
-            stack_trace_text = TelegramUtils.escape_markdown_v2_code(stack_trace)
+            # keep the whole thing under Telegram's 4096-char message limit
+            exception_text = escape_markdown(str(exception)[:500], version=2, entity_type="code")
+            stack_trace_text = escape_markdown(stack_trace[-3000:], version=2, entity_type="code")
             error_message = (
                 f"⚠️ *An exception occurred*:\n```\n{exception_text}\n```\n\nStack trace:\n```\n{stack_trace_text}\n```"
             )
@@ -208,7 +206,7 @@ class TelegramBot:
                 await query.answer("⚠️ Invalid subscription action")
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await self._respond(update, "⚙️ Use commands the following commands:")
+        await self._respond(update, "⚙️ Use one of the following commands:")
 
     async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
         reply_markup = reply_markup or self._get_keyboard_markup()

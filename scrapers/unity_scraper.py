@@ -3,8 +3,8 @@ import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from telegram.helpers import escape_markdown
 
-from bot.telegram_utils import TelegramUtils
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
@@ -46,9 +46,9 @@ class UnityScraper(ScraperInterface):
     def create_message(self, data: dict) -> str:
         messages = []
         for asset in data.get("assets", []):
-            name = TelegramUtils.escape_markdown_v2(asset.get("name", "<unknown>"))
-            url = TelegramUtils.escape_markdown_v2_url(asset.get("url", "<no-url>"))
-            coupon = TelegramUtils.escape_markdown_v2(asset.get("coupon", "No coupon available"))
+            name = escape_markdown(asset.get("name", "<unknown>"), version=2)
+            url = escape_markdown(asset.get("url", "<no-url>"), version=2, entity_type="text_link")
+            coupon = escape_markdown(asset.get("coupon") or "No coupon available", version=2, entity_type="code")
             messages.append(f" \\- *\\[Coupon: `{coupon}`\\]* [{name}]({url})")
 
         if not data.get("assets"):

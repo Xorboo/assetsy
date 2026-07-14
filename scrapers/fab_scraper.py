@@ -2,8 +2,8 @@ import json
 import re
 
 from selenium.webdriver.common.by import By
+from telegram.helpers import escape_markdown
 
-from bot.telegram_utils import TelegramUtils
 from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
@@ -41,12 +41,12 @@ class FabScraper(ScraperInterface):
 
     def create_message(self, data: dict) -> str:
         messages = []
-        end_date = TelegramUtils.escape_markdown_v2(data.get("end_date", "<Unknown end date>"))
+        end_date = escape_markdown(data.get("end_date", "<Unknown end date>"), version=2)
         messages.append(f"🦭 *UE Fab Marketplace Free Assets* \\({end_date}\\):")
 
         for item in data.get("items", []):
-            title = TelegramUtils.escape_markdown_v2(item.get("title", "<unknown>"))
-            url = TelegramUtils.escape_markdown_v2_url(item.get("url", "<no-url>"))
+            title = escape_markdown(item.get("title", "<unknown>"), version=2)
+            url = escape_markdown(item.get("url", "<no-url>"), version=2, entity_type="text_link")
             messages.append(f" \\- [{title}]({url})")
 
         if not data.get("items"):
