@@ -61,8 +61,6 @@ class TelegramBot:
         self.logger.info("Initialization complete")
 
     def start(self):
-        # explicit: Telegram remembers the last allowed_updates for the token, and a
-        # leftover ["message"] subscription silently drops all button callbacks
         self.application.run_polling(allowed_updates=Update.ALL_TYPES)
 
     async def notify_subscribers(self, scraper: str, message: str):
