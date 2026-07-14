@@ -166,8 +166,6 @@ class TelegramBot:
                 messages.append(scraper.create_message(assets))
         freebies_text = "\n\n".join(messages)
 
-        # Freeze the freebies as a plain button-less message (replacing the menu when
-        # coming from a button), then open a fresh menu below it
         if update.callback_query:
             try:
                 await update.callback_query.edit_message_text(freebies_text, parse_mode=ParseMode.MARKDOWN_V2)
@@ -215,7 +213,6 @@ class TelegramBot:
     async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
 
-        # Button presses edit the menu message in place instead of spamming the chat
         if update.callback_query:
             try:
                 await update.callback_query.edit_message_text(
