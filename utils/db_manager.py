@@ -13,7 +13,7 @@ class DBManager:
         uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
         database = os.environ.get("MONGO_DB", "assetsy")
         self.logger.info(f"Connecting to DB '{database}' on '{re.sub(r'://[^@]+@', '://<CREDENTIALS>@', uri)}'")
-        self.client = MongoClient(uri)
+        self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
         self.db = self.client[database]
         self.scraped_data_collection = self.db["scraped_data"]
         self.users_collection = self.db["telegram_users"]
