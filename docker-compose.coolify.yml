@@ -1,0 +1,31 @@
+# Reference compose for Coolify deployment.
+#
+# The bot is stateless — all state lives in a shared MongoDB created separately in
+# Coolify (Resources → New → MongoDB), same instance ObyWatcher uses. Set the env vars
+# in the Coolify UI; MONGO_URI is the internal connection string of that resource, e.g.
+#   mongodb://<user>:<pass>@<mongo-service-name>:27017
+
+services:
+  chrome:
+    image: selenium/standalone-chrome:latest
+    restart: unless-stopped
+    shm_size: 2g
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/wd/hub/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  bot:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      chrome:
+        condition: service_healthy
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      TELEGRAM_ADMIN_USER_ID: ${TELEGRAM_ADMIN_USER_ID}
+      MONGO_URI: ${MONGO_URI}
+      MONGO_DB: ${MONGO_DB:-assetsy}
+      SELENIUM_URL: http://chrome:4444/wd/hub

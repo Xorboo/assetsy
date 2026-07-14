@@ -58,6 +58,7 @@ Implement `ScraperInterface` (see `scrapers/fab_scraper.py` for the pattern) and
 ## Development
 
 ```sh
+uv run pytest
 uv run ruff check .
 uv run ruff format .
 ```
