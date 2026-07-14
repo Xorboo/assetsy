@@ -19,6 +19,7 @@ def main():
     db_manager = DBManager()
     bot = TelegramBot(db_manager)
     scraper = ScraperManager(bot, db_manager)
+    bot.scraper_manager = scraper
 
     async def scrape_job(context: ContextTypes.DEFAULT_TYPE):
         await scraper.process_scrapers()

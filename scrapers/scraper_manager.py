@@ -16,8 +16,13 @@ class ScraperManager:
         self.scrapers = get_scrapers()
         self.logger.info("Done")
 
-    async def process_scrapers(self):
+    async def process_scrapers(self, force: bool = False):
+        if not force and not self.db_manager.is_scraping_enabled():
+            self.logger.info("Scraping is disabled, skipping")
+            return
+
         self.logger.info("Processing scrapers...")
+        self.db_manager.set_last_scrape_at()
         errors = []
         for scraper in self.scrapers:
             scraper_name = scraper.get_scraper_name()

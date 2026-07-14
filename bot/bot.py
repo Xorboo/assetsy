@@ -4,9 +4,9 @@ import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, Forbidden, TelegramError
 from telegram.ext import (
     Application,
     CallbackContext,
@@ -14,6 +14,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
     MessageHandler,
+    TypeHandler,
     filters,
 )
 from telegram.helpers import escape_markdown
@@ -51,9 +52,10 @@ class TelegramBot:
         self.logger.info("Initializing...")
 
         token = os.environ["TELEGRAM_BOT_TOKEN"]
-        self.admin_user_id = os.environ["TELEGRAM_ADMIN_USER_ID"]
+        self.admin_user_id = int(os.environ["TELEGRAM_ADMIN_USER_ID"])
 
         self.db_manager = db_manager
+        self.scraper_manager = None  # set in assetsy.py after construction (circular otherwise)
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
 
         self.application = (
@@ -68,23 +70,47 @@ class TelegramBot:
 
     async def notify_subscribers(self, scraper: str, message: str):
         subscribers = self.db_manager.get_scraper_subscribers(scraper)
+        await self._send_to_users(subscribers, message, parse_mode=ParseMode.MARKDOWN_V2)
 
-        tasks = []
-        for user_id in subscribers:
-            task = self.application.bot.send_message(chat_id=user_id, text=message, parse_mode=ParseMode.MARKDOWN_V2)
-            tasks.append(task)
-
+    async def _send_to_users(self, user_ids: list[int], text: str, parse_mode: str | None = None) -> int:
+        tasks = [
+            self.application.bot.send_message(chat_id=user_id, text=text, parse_mode=parse_mode)
+            for user_id in user_ids
+        ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        for user_id, result in zip(subscribers, results, strict=True):
-            if isinstance(result, Exception):
+
+        sent = 0
+        for user_id, result in zip(user_ids, results, strict=True):
+            if isinstance(result, Forbidden):
+                self.logger.warning(f"User {user_id} blocked the bot, removing them")
+                self.db_manager.remove_user(user_id)
+            elif isinstance(result, Exception):
                 self.logger.error(f"Failed to send message to user {user_id}: {result}")
+            else:
+                sent += 1
+        return sent
+
+    async def _notify_admin(self, text: str):
+        try:
+            await self.application.bot.send_message(chat_id=self.admin_user_id, text=text)
+        except TelegramError as e:
+            self.logger.warning(f"Failed to notify admin: {e}")
 
     async def _post_init(self, application: Application) -> None:
         commands = [(cmd.command, cmd.description) for cmd in self.COMMANDS]
-        await self.application.bot.set_my_commands(commands)
+        await application.bot.set_my_commands(commands)
+        try:
+            await application.bot.set_my_commands(
+                commands + [("admin", "🛠 Admin console")], scope=BotCommandScopeChat(chat_id=self.admin_user_id)
+            )
+        except TelegramError as e:
+            self.logger.warning(f"Failed to set admin commands (no chat with admin yet?): {e}")
 
     def _setup_handlers(self):
         self.application.add_error_handler(self._handle_error)
+
+        # keeps name/username/created_at fresh for every interacting user
+        self.application.add_handler(TypeHandler(Update, self._track_user), group=-1)
 
         self.commands_callbacks = {}
         for command in self.COMMANDS:
@@ -92,8 +118,14 @@ class TelegramBot:
             self.application.add_handler(CommandHandler(command.command, callback_method))
             self.commands_callbacks[command.command] = callback_method
 
+        self.application.add_handler(CommandHandler("admin", self._admin_command))
         self.application.add_handler(CallbackQueryHandler(self._handle_callback))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message))
+
+    async def _track_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        user = update.effective_user
+        if user and not user.is_bot:
+            self.db_manager.upsert_user(user.id, user.first_name, user.username)
 
     async def _handle_error(self, update: Update, context: CallbackContext):
         try:
@@ -208,9 +240,138 @@ class TelegramBot:
             else:
                 self.logger.error(f"Unknown subscription action: {action}")
                 await query.answer("⚠️ Invalid subscription action")
+                return
+            if user_id != self.admin_user_id:
+                user = update.effective_user
+                await self._notify_admin(f"👤 {user.first_name} (@{user.username}, {user_id}) {action} [{scraper}]")
+
+        elif command_parts[0] == "adm":
+            if user_id != self.admin_user_id:
+                await query.answer("⛔ Not allowed")
+                return
+            await self._handle_admin_callback(update, context, command_parts[1])
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id == self.admin_user_id and context.user_data.pop("awaiting_broadcast", False):
+            await self._preview_broadcast(update, context)
+            return
         await self._respond(update, "⚙️ Use one of the following commands:")
+
+    # --- Admin console ---
+
+    async def _admin_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_user.id != self.admin_user_id:
+            return
+        await self._render_admin_menu(update)
+
+    async def _render_admin_menu(self, update: Update):
+        scraping_toggle = (
+            InlineKeyboardButton("⏸ Disable daily updates", callback_data="adm/toggle")
+            if self.db_manager.is_scraping_enabled()
+            else InlineKeyboardButton("▶️ Enable daily updates", callback_data="adm/toggle")
+        )
+        keyboard = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton("📊 Stats", callback_data="adm/stats")],
+                [InlineKeyboardButton("👥 Subscribers", callback_data="adm/subs")],
+                [InlineKeyboardButton("🔄 Scrape now", callback_data="adm/scrape")],
+                [scraping_toggle],
+                [InlineKeyboardButton("📢 Broadcast", callback_data="adm/broadcast")],
+                [InlineKeyboardButton("↩ Back", callback_data="help")],
+            ]
+        )
+        await self._respond(update, "🛠 *Admin console*", reply_markup=keyboard)
+
+    async def _handle_admin_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE, action: str):
+        query = update.callback_query
+
+        if action == "menu":
+            await query.answer()
+            await self._render_admin_menu(update)
+
+        elif action == "stats":
+            await query.answer()
+            users = self.db_manager.get_all_users()
+            lines = [
+                "📊 *Stats*",
+                escape_markdown(f"Users: {len(users)}", version=2),
+            ]
+            for scraper_name, scraper in self.scrapers.items():
+                count = sum(1 for u in users if scraper_name in u.get("subscriptions", []))
+                lines.append(escape_markdown(f"{scraper.get_friendly_name()}: {count} subscribers", version=2))
+            enabled = self.db_manager.is_scraping_enabled()
+            lines.append(escape_markdown(f"Daily updates: {'enabled ✅' if enabled else 'DISABLED ⏸'}", version=2))
+            last = self.db_manager.get_last_scrape_at()
+            lines.append(
+                escape_markdown(f"Last scrape: {last.strftime('%Y-%m-%d %H:%M UTC') if last else 'never'}", version=2)
+            )
+            await self._respond(update, "\n".join(lines), reply_markup=self._admin_back_markup())
+
+        elif action == "subs":
+            await query.answer()
+            lines = ["👥 *Users*"]
+            for user in self.db_manager.get_all_users():
+                subs = ", ".join(user.get("subscriptions", [])) or "no subscriptions"
+                label = f"{user.get('first_name') or '?'} (@{user.get('username')}, {user['user_id']}): {subs}"
+                lines.append(escape_markdown(f"• {label}", version=2))
+            await self._respond(update, "\n".join(lines), reply_markup=self._admin_back_markup())
+
+        elif action == "scrape":
+            await query.answer("🔄 Scrape started...")
+
+            async def run_scrape():
+                await self.scraper_manager.process_scrapers(force=True)
+                await self._notify_admin("✅ Manual scrape finished")
+
+            self.application.create_task(run_scrape())
+            await self._respond(update, "🔄 Scrape started\\.\\.\\.", reply_markup=self._admin_back_markup())
+
+        elif action == "toggle":
+            enabled = not self.db_manager.is_scraping_enabled()
+            self.db_manager.set_scraping_enabled(enabled)
+            await query.answer(f"Daily updates {'enabled ✅' if enabled else 'disabled ⏸'}")
+            await self._render_admin_menu(update)
+
+        elif action == "broadcast":
+            await query.answer()
+            context.user_data["awaiting_broadcast"] = True
+            await self._respond(update, "📢 Send me the broadcast message:", reply_markup=self._admin_back_markup())
+
+        elif action == "bc_send":
+            draft = context.user_data.pop("broadcast_draft", None)
+            if not draft:
+                await query.answer("⚠️ No pending broadcast")
+                return
+            await query.answer("📢 Sending...")
+            user_ids = [user["user_id"] for user in self.db_manager.get_all_users()]
+            sent = await self._send_to_users(user_ids, draft)
+            await query.edit_message_text(f"📢 Broadcast sent to {sent}/{len(user_ids)} users")
+
+        elif action == "bc_cancel":
+            context.user_data.pop("broadcast_draft", None)
+            context.user_data.pop("awaiting_broadcast", None)
+            await query.answer("Broadcast cancelled")
+            await self._render_admin_menu(update)
+
+        else:
+            self.logger.error(f"Unknown admin action: {action}")
+            await query.answer("⚠️ Unknown admin action")
+
+    def _admin_back_markup(self) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup([[InlineKeyboardButton("↩ Admin menu", callback_data="adm/menu")]])
+
+    async def _preview_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        draft = update.message.text
+        context.user_data["broadcast_draft"] = draft
+        user_count = len(self.db_manager.get_all_users())
+        keyboard = InlineKeyboardMarkup(
+            [
+                [InlineKeyboardButton(f"📢 Send to {user_count} users", callback_data="adm/bc_send")],
+                [InlineKeyboardButton("❌ Cancel", callback_data="adm/bc_cancel")],
+            ]
+        )
+        # no parse_mode: the draft is shown and sent verbatim
+        await update.message.reply_text(f"Preview:\n\n{draft}", reply_markup=keyboard)
 
     async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
