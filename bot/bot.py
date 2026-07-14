@@ -164,7 +164,21 @@ class TelegramBot:
             if scraper := self.scrapers.get(scraper_name):
                 assets = self.db_manager.get_assets(scraper_name)
                 messages.append(scraper.create_message(assets))
-        await self._respond(update, "\n\n".join(messages), new_message=True)
+        freebies_text = "\n\n".join(messages)
+
+        # Freeze the freebies as a plain button-less message (replacing the menu when
+        # coming from a button), then open a fresh menu below it
+        if update.callback_query:
+            try:
+                await update.callback_query.edit_message_text(freebies_text, parse_mode=ParseMode.MARKDOWN_V2)
+            except BadRequest as e:
+                self.logger.warning(f"Failed to edit message, sending a new one: {e}")
+                await update.effective_message.reply_text(freebies_text, parse_mode=ParseMode.MARKDOWN_V2)
+        else:
+            await update.effective_message.reply_text(freebies_text, parse_mode=ParseMode.MARKDOWN_V2)
+        await update.effective_message.reply_text(
+            "⚙️ Choose a command:", reply_markup=self._get_keyboard_markup(), parse_mode=ParseMode.MARKDOWN_V2
+        )
 
     async def _handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -198,18 +212,11 @@ class TelegramBot:
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await self._respond(update, "⚙️ Use commands the following commands:")
 
-    async def _respond(
-        self,
-        update: Update,
-        message: str,
-        reply_markup: InlineKeyboardMarkup | None = None,
-        new_message: bool = False,
-    ):
+    async def _respond(self, update: Update, message: str, reply_markup: InlineKeyboardMarkup | None = None):
         reply_markup = reply_markup or self._get_keyboard_markup()
 
-        # Button presses edit the menu message in place; new_message forces a separate
-        # message for content worth keeping in the chat history
-        if update.callback_query and not new_message:
+        # Button presses edit the menu message in place instead of spamming the chat
+        if update.callback_query:
             try:
                 await update.callback_query.edit_message_text(
                     message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
