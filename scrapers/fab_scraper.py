@@ -8,9 +8,8 @@ from scrapers.scraper_interface import ScraperInterface
 from utils.logger import setup_logger
 from utils.selenium_driver import get_driver
 
-# Same JSON the fab.com homepage embeds as prefetched data, served directly as an API.
-# Cloudflare 403s plain python HTTP clients (TLS fingerprinting), so we fetch it through
-# the Selenium browser — much lighter than rendering the whole homepage.
+# Cloudflare 403s plain python HTTP clients (TLS fingerprinting), so this API is
+# fetched through the Selenium browser instead
 HOMEPAGE_LAYOUT_URL = "https://www.fab.com/i/layouts/homepage"
 FREE_BLADE_TITLE = "Limited-Time Free"
 
@@ -82,8 +81,7 @@ class FabScraper(ScraperInterface):
         if not free_blade:
             return
 
-        # Everything in the Limited-Time Free blade is free; the old discountedPrice==0
-        # check broke when Fab dropped that field from startingPrice.
+        # everything in this blade is free — don't filter by price fields, Fab removes them
         for tile in free_blade.get("tiles", []):
             listing = tile.get("listing", {})
             uid = listing.get("uid")

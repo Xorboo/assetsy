@@ -23,9 +23,8 @@ def main():
     async def scrape_job(context: ContextTypes.DEFAULT_TYPE):
         await scraper.process_scrapers()
 
-    # first=1 makes the first scrape happen right away instead of 24h after every restart;
-    # the misfire grace covers the gap between scheduling here and the job queue actually
-    # starting (after Telegram init), which would otherwise silently skip the first run
+    # misfire grace: the job queue starts after Telegram init, which would otherwise
+    # silently skip the immediate first run
     bot.application.job_queue.run_repeating(
         scrape_job, interval=SCRAPE_INTERVAL, first=1, job_kwargs={"misfire_grace_time": 300}
     )

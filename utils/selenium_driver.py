@@ -5,8 +5,7 @@ from selenium import webdriver
 
 def get_driver():
     chrome_options = webdriver.ChromeOptions()
-    # Don't wait for the full 'load' event of heavy storefront pages; scrapers
-    # explicitly wait for the elements they need.
+    # eager: storefront pages take forever to fire 'load'; scrapers wait for their own elements
     chrome_options.page_load_strategy = "eager"
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--disable-gpu")
@@ -20,6 +19,6 @@ def get_driver():
 
     selenium_url = os.environ.get("SELENIUM_URL", "http://localhost:4444/wd/hub")
     driver = webdriver.Remote(command_executor=selenium_url, options=chrome_options)
-    driver.set_page_load_timeout(90)
+    driver.set_page_load_timeout(30)
     driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
     return driver
