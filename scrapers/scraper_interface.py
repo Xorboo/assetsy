@@ -17,3 +17,7 @@ class ScraperInterface(ABC):
     @abstractmethod
     def create_message(self, data: dict) -> str:
         pass
+
+    def create_update_message(self, old_data: dict, new_data: dict) -> str | None:
+        """Message to send subscribers when stored data changed; None skips the notification."""
+        return self.create_message(new_data)

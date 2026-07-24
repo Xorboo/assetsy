@@ -44,7 +44,10 @@ class ScraperManager:
             self.logger.info(f"Changes detected for [{scraper_name}]")
             self.db_manager.update_assets(scraper_name, new_assets)
 
-            message = scraper.create_message(new_assets)
+            message = scraper.create_update_message(stored_assets, new_assets)
+            if message is None:
+                self.logger.info(f"Change for [{scraper_name}] not notification-worthy, skipping")
+                return
             await self.bot.notify_subscribers(scraper_name, message)
         else:
             self.logger.info(f"No changes detected for [{scraper_name}]")

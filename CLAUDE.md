@@ -15,6 +15,7 @@ docker compose up -d mongo chrome   # infra only, then:
 python assetsy.py            # run the bot locally against dockerized mongo/chrome (.env supplies config)
 python -m scrapers.fab_scraper      # run one scraper standalone (needs chrome container up)
 python -m scrapers.unity_scraper
+python -m scrapers.itch_scraper     # no chrome needed; takes ~6 min (paginated with delays)
 uv run pytest                # tests (pure parsing/formatting only)
 uv run ruff check .          # lint (config in pyproject.toml)
 uv run ruff format .
@@ -30,7 +31,7 @@ Entry point `assetsy.py` wires `DBManager` → `TelegramBot` → `ScraperManager
 - **`bot/bot.py`** — `TelegramBot` (python-telegram-bot v22, polling with `allowed_updates=Update.ALL_TYPES` — Telegram persists the token's last subscription, and a stale one silently drops button callbacks). Inline keyboards edit the menu message in place; freebies/notifications are separate button-less messages. All outgoing text is MarkdownV2 — always escape via `telegram.helpers.escape_markdown(version=2, entity_type=...)` or Telegram rejects the message. Errors are forwarded to `TELEGRAM_ADMIN_USER_ID`.
 - **Admin console** — `/admin` (restricted to `TELEGRAM_ADMIN_USER_ID`, callback prefix `adm/`): stats, subscriber list, force scrape (works while paused), pause/resume daily updates (persisted in `runtime_state`), broadcast (draft → preview → confirm, sent verbatim without parse_mode). Admin also gets alerts on subscribe/unsubscribe; users who blocked the bot are auto-removed when a send fails with `Forbidden`.
 - **`scrapers/`** — one class per marketplace implementing `ScraperInterface` (`get_scraper_name` = stable DB/subscription key, `get_friendly_name`, `scrape_data() -> dict`, `create_message(data) -> str`). `scrapers/scrapers.py:get_scrapers()` is the single registry — add a scraper there and both `ScraperManager` and the bot pick it up. Each scraper has a `__main__` block for standalone testing.
-- **`scrapers/scraper_manager.py`** — change detection: compares fresh `scrape_data()` output against the stored dict with `!=`; only on difference does it write to DB and notify subscribers. Scrapers must return deterministic dicts or every run looks like a change. Scrapes run via `asyncio.to_thread` (sync Selenium would freeze the bot); one scraper failing doesn't stop the others, failures are re-raised afterwards so the admin alert fires.
+- **`scrapers/scraper_manager.py`** — change detection: compares fresh `scrape_data()` output against the stored dict with `!=`; only on difference does it write to DB and call `create_update_message(old, new)` — default returns the full `create_message(new)`, returning `None` stores the change without notifying (itch uses this to only announce newly-appeared items). Scrapers must return deterministic dicts or every run looks like a change. Scrapes run via `asyncio.to_thread` (sync Selenium would freeze the bot); one scraper failing doesn't stop the others, failures are re-raised afterwards so the admin alert fires.
 - **`utils/selenium_driver.py`** — remote headless Chrome (`SELENIUM_URL`) with anti-bot tweaks. Uses `eager` page-load strategy: heavy storefront pages never finish their `load` event in reasonable time, so scrapers must explicitly wait for the elements they need. Scrapers must `driver.quit()` in a `finally`.
 - **`utils/logger.py`** — `setup_logger()` configures the root logger once (INFO, stdout). Library logs (PTB, APScheduler) are intentionally visible; that's how silent job misfires were caught.
 
@@ -38,6 +39,7 @@ Entry point `assetsy.py` wires `DBManager` → `TelegramBot` → `ScraperManager
 
 - **Fab**: `https://www.fab.com/i/layouts/homepage` returns the same JSON the homepage embeds. Cloudflare 403s plain Python HTTP clients (TLS fingerprinting — httpx fails even with browser headers/http2), so it's fetched by navigating Selenium Chrome straight to the API URL and reading the `<pre>` body. Everything in the "Limited-Time Free" blade is free — do not filter by price fields, Fab removed `discountedPrice` once already.
 - **Unity**: renders `https://assetstore.unity.com/publisher-sale` and reads `section[data-type="CalloutSlim"]` elements (name, url, coupon code).
+- **itch**: no Cloudflare — plain `urllib` works. `https://itch.io/game-assets/on-sale?page=N&format=json` returns `{page, num_items, content: "<html cells>"}`; all ~70 pages are walked (stop on empty page) and filtered to `sale_tag == -100%`. There is no server-side discount filter (`/game-assets/free/on-sale` returns 0 items — "free" means base price). Rate limiter is touchy and escalates against sustained traffic: 5s between pages tripped it on nearly every page, 20s stays under it; 429s are retried with escalating 60s+ backoffs (a single retry proved not enough). Since individual sales start/stop at random times, subscribers are only notified about *new* items; removals just update the stored list.
 
 ## Gotchas
 
