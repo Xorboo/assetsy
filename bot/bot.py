@@ -58,9 +58,7 @@ class TelegramBot:
         self.scraper_manager = None  # set in assetsy.py after construction (circular otherwise)
         self.scrapers = {scraper.get_scraper_name(): scraper for scraper in get_scrapers()}
 
-        self.application = (
-            Application.builder().token(token).concurrent_updates(True).post_init(self._post_init).build()
-        )
+        self.application = Application.builder().token(token).concurrent_updates(True).post_init(self._post_init).build()
         self._setup_handlers()
 
         self.logger.info("Initialization complete")
@@ -73,10 +71,7 @@ class TelegramBot:
         await self._send_to_users(subscribers, message, parse_mode=ParseMode.MARKDOWN_V2)
 
     async def _send_to_users(self, user_ids: list[int], text: str, parse_mode: str | None = None) -> int:
-        tasks = [
-            self.application.bot.send_message(chat_id=user_id, text=text, parse_mode=parse_mode)
-            for user_id in user_ids
-        ]
+        tasks = [self.application.bot.send_message(chat_id=user_id, text=text, parse_mode=parse_mode) for user_id in user_ids]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         sent = 0
@@ -136,17 +131,11 @@ class TelegramBot:
             # keep the whole thing under Telegram's 4096-char message limit
             exception_text = escape_markdown(str(exception)[:500], version=2, entity_type="code")
             stack_trace_text = escape_markdown(stack_trace[-3000:], version=2, entity_type="code")
-            error_message = (
-                f"⚠️ *An exception occurred*:\n```\n{exception_text}\n```\n\nStack trace:\n```\n{stack_trace_text}\n```"
-            )
-            await self.application.bot.send_message(
-                chat_id=self.admin_user_id, text=error_message, parse_mode=ParseMode.MARKDOWN_V2
-            )
+            error_message = f"⚠️ *An exception occurred*:\n```\n{exception_text}\n```\n\nStack trace:\n```\n{stack_trace_text}\n```"
+            await self.application.bot.send_message(chat_id=self.admin_user_id, text=error_message, parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as e:
             inner_stack_trace = "".join(traceback.format_exception(None, e, e.__traceback__))
-            self.logger.error(
-                f"Failed to send error message to admin: {e}\n\n{inner_stack_trace}\n\nOriginal error: {exception}"
-            )
+            self.logger.error(f"Failed to send error message to admin: {e}\n\n{inner_stack_trace}\n\nOriginal error: {exception}")
 
     def _get_keyboard_markup(self, exclude_commands: list[CommandType] | None = None) -> InlineKeyboardMarkup:
         keyboard = [
@@ -302,9 +291,7 @@ class TelegramBot:
             enabled = self.db_manager.is_scraping_enabled()
             lines.append(escape_markdown(f"Daily updates: {'enabled ✅' if enabled else 'DISABLED ⏸'}", version=2))
             last = self.db_manager.get_last_scrape_at()
-            lines.append(
-                escape_markdown(f"Last scrape: {last.strftime('%Y-%m-%d %H:%M UTC') if last else 'never'}", version=2)
-            )
+            lines.append(escape_markdown(f"Last scrape: {last.strftime('%Y-%m-%d %H:%M UTC') if last else 'never'}", version=2))
             await self._respond(update, "\n".join(lines), reply_markup=self._admin_back_markup())
 
         elif action == "subs":
@@ -378,9 +365,7 @@ class TelegramBot:
 
         if update.callback_query:
             try:
-                await update.callback_query.edit_message_text(
-                    message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2
-                )
+                await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode=ParseMode.MARKDOWN_V2)
                 return
             except BadRequest as e:
                 if "not modified" in str(e).lower():

@@ -14,8 +14,7 @@ from utils.logger import setup_logger
 ON_SALE_PAGE_URL = "https://itch.io/game-assets/on-sale"
 BROWSE_URL = "https://itch.io/game-assets/on-sale?page={page}&format=json"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    " (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     "Accept": "application/json",
     "Accept-Language": "en-US,en;q=0.9",
 }
@@ -114,11 +113,7 @@ class ItchScraper(ScraperInterface):
         return parser.cells
 
     def _parse_free_items(self, cells: list[dict]) -> list[dict]:
-        return [
-            {"id": cell["id"], "title": cell["title"], "url": cell["url"]}
-            for cell in cells
-            if cell["sale"].strip() == "-100%"
-        ]
+        return [{"id": cell["id"], "title": cell["title"], "url": cell["url"]} for cell in cells if cell["sale"].strip() == "-100%"]
 
     def _format_items(self, header: str, items: list[dict]) -> str:
         messages = [header]

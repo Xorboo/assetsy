@@ -29,9 +29,7 @@ class UnityScraper(ScraperInterface):
         assets = []
         try:
             wait = WebDriverWait(driver, 10)
-            sections = wait.until(
-                EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section[data-type="CalloutSlim"]'))
-            )
+            sections = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section[data-type="CalloutSlim"]')))
             for section in sections:
                 name = self._scrape_asset_name(section)
                 url = self._scrape_asset_url(section)

@@ -23,7 +23,7 @@ package = false
 testpaths = ["tests"]
 
 [tool.ruff]
-line-length = 119
+line-length = 140
 target-version = "py312"
 
 [tool.ruff.lint]

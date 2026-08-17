@@ -71,14 +71,10 @@ class DBManager:
         return bool(doc.get("scraping_enabled", True)) if doc else True
 
     def set_scraping_enabled(self, enabled: bool) -> None:
-        self.runtime_state_collection.update_one(
-            {"_id": "global"}, {"$set": {"scraping_enabled": enabled}}, upsert=True
-        )
+        self.runtime_state_collection.update_one({"_id": "global"}, {"$set": {"scraping_enabled": enabled}}, upsert=True)
 
     def set_last_scrape_at(self) -> None:
-        self.runtime_state_collection.update_one(
-            {"_id": "global"}, {"$set": {"last_scrape_at": datetime.now(UTC)}}, upsert=True
-        )
+        self.runtime_state_collection.update_one({"_id": "global"}, {"$set": {"last_scrape_at": datetime.now(UTC)}}, upsert=True)
 
     def get_last_scrape_at(self) -> datetime | None:
         doc = self.runtime_state_collection.find_one({"_id": "global"})

@@ -26,9 +26,7 @@ def main():
 
     # misfire grace: the job queue starts after Telegram init, which would otherwise
     # silently skip the immediate first run
-    bot.application.job_queue.run_repeating(
-        scrape_job, interval=SCRAPE_INTERVAL, first=1, job_kwargs={"misfire_grace_time": 300}
-    )
+    bot.application.job_queue.run_repeating(scrape_job, interval=SCRAPE_INTERVAL, first=1, job_kwargs={"misfire_grace_time": 300})
 
     try:
         logger.info("Starting bot...")
