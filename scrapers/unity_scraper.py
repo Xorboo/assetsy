@@ -31,10 +31,9 @@ class UnityScraper(ScraperInterface):
             wait = WebDriverWait(driver, 10)
             sections = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section[data-type="CalloutSlim"]')))
             for section in sections:
-                name = self._scrape_asset_name(section)
-                url = self._scrape_asset_url(section)
-                coupon_code = self._scrape_asset_coupon(section)
-                assets.append({"name": name, "url": url, "coupon": coupon_code})
+                name = section.find_element(By.TAG_NAME, "h2").text
+                url = section.find_element(By.TAG_NAME, "a").get_attribute("href")
+                assets.append({"name": name, "url": url, "coupon": self._scrape_asset_coupon(section)})
         finally:
             driver.quit()
 
@@ -54,32 +53,10 @@ class UnityScraper(ScraperInterface):
 
         return "🦭 *Unity Free Assets*:\n" + "\n".join(messages)
 
-    def _scrape_asset_name(self, section):
-        name = "<error>"
-        try:
-            name = section.find_element(By.TAG_NAME, "h2").text
-        except Exception as e:
-            self.logger.error(f"Error extracting name: {e}")
-        return name
-
-    def _scrape_asset_url(self, section):
-        url = "<error>"
-        try:
-            url = section.find_element(By.TAG_NAME, "a").get_attribute("href")
-        except Exception as e:
-            self.logger.error(f"Error extracting URL: {e}")
-        return url
-
     def _scrape_asset_coupon(self, section):
-        coupon_code = "<error>"
-        try:
-            coupon_code_element = section.find_element(By.CSS_SELECTOR, "span.body")
-            coupon_code_text = coupon_code_element.text
-            coupon_code_match = re.search(r"coupon code (\S+)", coupon_code_text, re.IGNORECASE)
-            coupon_code = coupon_code_match.group(1) if coupon_code_match else None
-        except Exception as e:
-            self.logger.error(f"Error extracting coupon code: {e}")
-        return coupon_code
+        text = section.find_element(By.CSS_SELECTOR, "span.body").text
+        match = re.search(r"coupon code (\S+)", text, re.IGNORECASE)
+        return match.group(1) if match else None
 
 
 if __name__ == "__main__":

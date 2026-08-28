@@ -79,7 +79,7 @@ class FabScraper(ScraperInterface):
                 break
 
         if not free_blade:
-            return
+            raise RuntimeError(f"No '{FREE_BLADE_TITLE}' blade on the Fab homepage layout, the response format changed")
 
         # everything in this blade is free — don't filter by price fields, Fab removes them
         for tile in free_blade.get("tiles", []):

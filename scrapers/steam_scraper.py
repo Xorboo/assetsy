@@ -72,6 +72,8 @@ class SteamScraper(ScraperInterface):
         for page in range(MAX_PAGES):
             rows, total = self._fetch_page(page * PAGE_SIZE)
             if not rows:
+                if total:
+                    raise RuntimeError(f"Steam reports {total} results but no rows parsed, the search markup changed")
                 break
             for row in rows:
                 if row["id"] not in seen:

@@ -1,3 +1,5 @@
+import pytest
+
 from scrapers.fab_scraper import FabScraper
 
 # Trimmed-down copy of the real /i/layouts/homepage response shape
@@ -32,10 +34,9 @@ def test_parses_free_blade():
     ]
 
 
-def test_empty_homepage():
-    result = FabScraper()._parse_free_items({})
-
-    assert result == {"end_date": "", "items": []}
+def test_empty_homepage_raises():
+    with pytest.raises(RuntimeError, match="blade"):
+        FabScraper()._parse_free_items({})
 
 
 def test_create_message_escapes_markdown():

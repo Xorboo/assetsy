@@ -1,6 +1,5 @@
 import asyncio
 import os
-import traceback
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -21,7 +20,7 @@ from telegram.helpers import escape_markdown
 
 from scrapers.scrapers import get_scrapers
 from utils.db_manager import DBManager
-from utils.logger import setup_logger
+from utils.logger import format_exception, setup_logger
 
 
 class CommandType(Enum):
@@ -125,7 +124,7 @@ class TelegramBot:
     async def _handle_error(self, update: Update, context: CallbackContext):
         try:
             exception = context.error
-            stack_trace = "".join(traceback.format_exception(None, exception, exception.__traceback__))
+            stack_trace = format_exception(exception)
             self.logger.error(f"Exception occurred: {exception}\n\n{stack_trace}")
 
             # keep the whole thing under Telegram's 4096-char message limit
@@ -134,7 +133,7 @@ class TelegramBot:
             error_message = f"⚠️ *An exception occurred*:\n```\n{exception_text}\n```\n\nStack trace:\n```\n{stack_trace_text}\n```"
             await self.application.bot.send_message(chat_id=self.admin_user_id, text=error_message, parse_mode=ParseMode.MARKDOWN_V2)
         except Exception as e:
-            inner_stack_trace = "".join(traceback.format_exception(None, e, e.__traceback__))
+            inner_stack_trace = format_exception(e)
             self.logger.error(f"Failed to send error message to admin: {e}\n\n{inner_stack_trace}\n\nOriginal error: {exception}")
 
     def _get_keyboard_markup(self, exclude_commands: list[CommandType] | None = None) -> InlineKeyboardMarkup:

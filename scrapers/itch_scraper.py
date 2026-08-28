@@ -73,6 +73,8 @@ class ItchScraper(ScraperInterface):
                 time.sleep(PAGE_DELAY_SECONDS)
             cells = self._fetch_page(page)
             if not cells:
+                if page == 1:
+                    raise RuntimeError("itch.io returned no game cells on page 1, the browse markup changed")
                 break
             items.extend(self._parse_free_items(cells))
         else:
