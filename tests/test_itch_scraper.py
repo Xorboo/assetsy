@@ -1,3 +1,5 @@
+import urllib.error
+
 from scrapers.itch_scraper import ItchScraper, _GameCellParser
 
 # Trimmed-down copy of a real browse ?format=json "content" cell
@@ -100,6 +102,22 @@ def test_scrape_walks_pages_until_empty_and_sorts(monkeypatch):
             {"id": "9", "title": "B", "url": "u9"},
         ]
     }
+
+
+def test_fetch_page_treats_404_past_first_page_as_end(monkeypatch):
+    def not_found(request, timeout):
+        raise urllib.error.HTTPError(request.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("scrapers.itch_scraper.urllib.request.urlopen", not_found)
+    scraper = ItchScraper()
+
+    assert scraper._fetch_page(201) == []
+    try:
+        scraper._fetch_page(1)
+    except urllib.error.HTTPError as e:
+        assert e.code == 404
+    else:
+        raise AssertionError("404 on page 1 must raise")
 
 
 def test_create_message_no_items():

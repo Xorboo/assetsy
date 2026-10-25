@@ -15,7 +15,7 @@ docker compose up -d mongo chrome   # infra only, then:
 python assetsy.py            # run the bot locally against dockerized mongo/chrome (.env supplies config)
 python -m scrapers.fab_scraper      # run one scraper standalone (needs chrome container up)
 python -m scrapers.unity_scraper
-python -m scrapers.itch_scraper     # no chrome needed; takes ~6 min (paginated with delays)
+python -m scrapers.itch_scraper     # not registered in the bot; no chrome needed; takes ~70 min (200 pages, 20s apart)
 python -m scrapers.steam_scraper    # no chrome needed; one request
 uv run pytest                # tests (pure parsing/formatting only)
 uv run ruff check .          # lint (config in pyproject.toml)
@@ -40,7 +40,7 @@ Entry point `assetsy.py` wires `DBManager` → `TelegramBot` → `ScraperManager
 
 - **Fab**: `https://www.fab.com/i/layouts/homepage` returns the same JSON the homepage embeds. Cloudflare 403s plain Python HTTP clients (TLS fingerprinting — httpx fails even with browser headers/http2), so it's fetched by navigating Selenium Chrome straight to the API URL and reading the `<pre>` body. Everything in the "Limited-Time Free" blade is free — do not filter by price fields, Fab removed `discountedPrice` once already.
 - **Unity**: renders `https://assetstore.unity.com/publisher-sale` and reads `section[data-type="CalloutSlim"]` elements (name, url, coupon code).
-- **itch**: no Cloudflare — plain `urllib` works. `https://itch.io/game-assets/on-sale?page=N&format=json` returns `{page, num_items, content: "<html cells>"}`; all ~70 pages are walked (stop on empty page) and filtered to `sale_tag == -100%`. There is no server-side discount filter (`/game-assets/free/on-sale` returns 0 items — "free" means base price). Rate limiter is touchy and escalates against sustained traffic: 5s between pages tripped it on nearly every page, 20s stays under it; 429s are retried with escalating 60s+ backoffs (a single retry proved not enough). Since individual sales start/stop at random times, subscribers are only notified about *new* items; removals just update the stored list.
+- **itch** (disabled - not in `get_scrapers()`, stored `"itch"` subscriptions are kept so re-enabling restores them): no Cloudflare — plain `urllib` works. `https://itch.io/game-assets/on-sale?page=N&format=json` returns `{page, num_items, content: "<html cells>"}`; all pages are walked (stop on empty page or 404; itch caps the listing at 200 pages, so items past ~7200 are not reachable) and filtered to `sale_tag == -100%`. There is no server-side discount filter (`/game-assets/free/on-sale` returns 0 items — "free" means base price). Rate limiter is touchy and escalates against sustained traffic: 5s between pages tripped it on nearly every page, 20s stays under it; 429s are retried with escalating 60s+ backoffs (a single retry proved not enough). Since individual sales start/stop at random times, subscribers are only notified about *new* items; removals just update the stored list.
 - **Steam**: no Cloudflare either. `store.steampowered.com/search/results/?<filters>&start=N&count=100&infinite=1` returns `{results_html, total_count}` - the same rows the search page shows. The query string (`maxprice=free&specials=1&category1=998&ndl=1`) does the 100%-off filtering server side, so the parser reads only `data-ds-appid` and `href` from each row and falls back to the URL slug if the title element is renamed. Like itch, only *new* app ids trigger a notification.
 
 ## Gotchas

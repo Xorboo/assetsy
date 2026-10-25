@@ -22,7 +22,8 @@ HEADERS = {
 PAGE_DELAY_SECONDS = 20
 RATE_LIMIT_RETRIES = 4
 RATE_LIMIT_RETRY_SECONDS = 60
-MAX_PAGES = 150
+# itch caps browse pagination at 200 pages and answers 404 past the last one
+MAX_PAGES = 250
 
 
 class _GameCellParser(HTMLParser):
@@ -104,6 +105,8 @@ class ItchScraper(ScraperInterface):
                     body = json.loads(response.read())
                 break
             except urllib.error.HTTPError as e:
+                if e.code == 404 and page > 1:
+                    return []
                 if e.code != 429 or attempt == RATE_LIMIT_RETRIES:
                     raise
                 delay = RATE_LIMIT_RETRY_SECONDS * (attempt + 1)

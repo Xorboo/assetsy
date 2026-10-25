@@ -216,6 +216,11 @@ class TelegramBot:
 
         elif command_parts[0] == "sub":
             action, scraper = command_parts[1:]
+            if scraper not in self.scrapers:
+                # buttons on old menu messages can still point to an unregistered scraper
+                await query.answer("⚠️ This source is no longer available")
+                await self._render_subscriptions(update)
+                return
             name = self.scrapers[scraper].get_friendly_name()
             if action == "add":
                 self.db_manager.add_subscription(user_id, scraper)
