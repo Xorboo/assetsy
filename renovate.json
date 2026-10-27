@@ -43,6 +43,19 @@
       "automerge": true,
       "automergeType": "pr",
       "platformAutomerge": true
+    },
+    {
+      "description": "Keep the dev Mongo on the production major (Coolify mongodb-shared, mongo:7); upgrade both together by hand.",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "mongo"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "enabled": false
     }
   ]
 }
