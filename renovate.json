@@ -10,6 +10,7 @@
   "semanticCommits": "disabled",
   "commitMessagePrefix": "deps(chore):",
   "commitMessageAction": "update",
+  "rangeStrategy": "bump",
   "labels": [
     "dependencies"
   ],
