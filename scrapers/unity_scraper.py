@@ -30,10 +30,7 @@ class UnityScraper(ScraperInterface):
         try:
             wait = WebDriverWait(driver, 10)
             sections = wait.until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'section[data-type="CalloutSlim"]')))
-            for section in sections:
-                name = section.find_element(By.TAG_NAME, "h2").text
-                url = section.find_element(By.TAG_NAME, "a").get_attribute("href")
-                assets.append({"name": name, "url": url, "coupon": self._scrape_asset_coupon(section)})
+            assets = [asset for asset in map(self._parse_section, sections) if asset]
         finally:
             driver.quit()
 
@@ -52,6 +49,17 @@ class UnityScraper(ScraperInterface):
             messages.append(" \\- ⚠️ No free items found")
 
         return "🦭 *Unity Free Assets*:\n" + "\n".join(messages)
+
+    def _parse_section(self, section) -> dict | None:
+        name = section.find_element(By.TAG_NAME, "h2").text
+        links = section.find_elements(By.TAG_NAME, "a")
+        if not links:
+            # between sales Unity shows this banner with the same markup but no link
+            if "check back soon" in name.lower():
+                self.logger.info(f"Skipping placeholder section: {name}")
+                return None
+            raise ValueError(f"Unity sale section has no link: {name!r}")
+        return {"name": name, "url": links[0].get_attribute("href"), "coupon": self._scrape_asset_coupon(section)}
 
     def _scrape_asset_coupon(self, section):
         text = section.find_element(By.CSS_SELECTOR, "span.body").text
