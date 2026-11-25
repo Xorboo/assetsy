@@ -5,7 +5,7 @@ from enum import Enum, auto
 
 from telegram import BotCommandScopeChat, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
-from telegram.error import BadRequest, Forbidden, TelegramError
+from telegram.error import BadRequest, Forbidden, NetworkError, TelegramError
 from telegram.ext import (
     Application,
     CallbackContext,
@@ -122,6 +122,10 @@ class TelegramBot:
             self.db_manager.upsert_user(user.id, user.first_name, user.username)
 
     async def _handle_error(self, update: Update, context: CallbackContext):
+        # PTB retries polling on its own; a blip in the connection is not worth an alert
+        if isinstance(context.error, NetworkError):
+            self.logger.warning(f"Telegram network error: {context.error}")
+            return
         try:
             exception = context.error
             stack_trace = format_exception(exception)
