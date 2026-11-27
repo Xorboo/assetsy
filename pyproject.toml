@@ -2,18 +2,18 @@
 name = "assetsy"
 version = "0.1.0"
 description = "Telegram bot that watches game-asset marketplaces for limited-time free assets"
-requires-python = ">=3.12"
+requires-python = ">=3.15.2"
 dependencies = [
-    "pymongo>=4.9",
-    "python-dotenv>=1.0",
-    "python-telegram-bot[job-queue]>=22.0",
-    "selenium>=4.30",
+    "pymongo>=4.20.2",
+    "python-dotenv>=1.2.4",
+    "python-telegram-bot[job-queue]>=22.8",
+    "selenium>=4.54.0",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.0",
-    "ruff>=0.6",
+    "pytest>=9.2.0",
+    "ruff>=0.17.6",
 ]
 
 [tool.uv]
